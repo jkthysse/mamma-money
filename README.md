@@ -14,13 +14,11 @@ This repository contains a containerised Go web server and development documenta
 - `src/helm`: Helm templates
 - `src/.dockerignore`: Docker ignore file
 - `src/Dockerfile`: Docker configuration file
-- `.env.example`: Example environment configuration file
+- `ops/.env.example`: Example environment configuration file
+- `ops/environment.sh`: Operational environment bootstrap script
 - `.gitattributes`: Normalise all text files to LF line endings on checkout 
 - `.gitignore`: Keeps local environment configuration file out of the repo
-- `build.sh`: Operational build script for non-technical operators
-- `environment.sh`: Operational environment script to maintain DRY coding standards
-- `run.sh`: Operational run script for non-technical operators
-- `verify.sh`: Operational test script for non-technical operators
+- `mamma.sh`: Unified operational script (build/run/verify/menu)
 - `README.md`: Developer usage documentation (this document)
 
 ## Prerequisites
@@ -31,7 +29,7 @@ This repository contains a containerised Go web server and development documenta
 
 ## Configuration
 
-Copy the `.env.example` in the root of the project to `.env` and update the values to match your desired configuration.
+Copy `ops/.env.example` to `ops/.env` and update values for the target environment.
 
 ## Shell compatibility
 Commands in this repository are written for Bash.
@@ -41,15 +39,15 @@ Commands in this repository are written for Bash.
 
 ### First-run checklist
 
-1. Create `.env` from `.env.example`
+1. Create `ops/.env` from `ops/.env.example`
 2. Confirm `PLATFORM`, `PORT`, and `IMAGE` values
-3. Run build, run, verify scripts from repo root
+3. Run `mamma.sh` commands from repo root
 
 ### Start here
 - Run app locally (developer): see `src/app` and [Developer Flow](./README.md#developer-flow---run-with-go).
 - Build/run container feature details: see [Docker Feature Documentation](./doc/docker.md) and [Operator Flow](./README.md#operator-flow---run-with-docker).
 - See [Helm deployment details](./doc/helm.md)
-- See [CI behavior and trade-offs](./doc/pipeline.md)
+- See [CI behaviour and trade-offs](./doc/pipeline.md)
 - See [Contribution workflow](./doc/contributing.md)
 
 ### Developer Flow - Run with Go:
@@ -65,30 +63,30 @@ The app listens on `PORT` (default `8080`).
 
 Run these commands from the repository root.
 
-Build:
+Command mode:
 
 ```bash
-bash ./build.sh
+bash ./mamma.sh build
+bash ./mamma.sh b
+bash ./mamma.sh run
+bash ./mamma.sh r
+bash ./mamma.sh verify
+bash ./mamma.sh v
+bash ./mamma.sh all
 ```
 
-Run:
+Interactive menu:
 
 ```bash
-bash ./run.sh
-```
-
-Smoke test:
-
-```bash
-bash ./verify.sh
+bash ./mamma.sh
 ```
 
 ## Troubleshooting
 
 - `Error: .env not found`  
-  Create `.env` from `.env.example` in repo root.
+  Create `ops/.env` from `ops/.env.example`.
 - `bind: address already in use`  
-  Change `PORT` in `.env` or stop the process using that port.
+  Change `PORT` in `ops/.env` or stop the process using that port.
 - `buildx` command unavailable  
   Ensure Docker Desktop is up to date and Buildx is enabled.
 

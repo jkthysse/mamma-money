@@ -34,7 +34,7 @@ image:
   tag: local
 ```
 
-The default tag is `local` to match the image produced by `./build.sh` on a developer machine. In CI and production this would be overridden with the git short SHA at deploy time using `--set image.tag=$SHA`.
+The default tag is `local` to match the image produced by `bash ./mamma.sh build` on a developer machine. In CI and production this would be overridden with the git short SHA at deploy time using `--set image.tag=$SHA`.
 
 ```yaml
 service:
