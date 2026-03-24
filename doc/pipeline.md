@@ -25,3 +25,17 @@ Hadolint is a Dockerfile linter that checks for common mistakes and deviations f
 
 Using the official `hadolint-action` keeps the step clean — no manual installation, no curl scripts, and the action pins to a specific version so the linting behaviour doesn't change unexpectedly between runs.
 
+### Build Docker image
+ 
+```yaml
+build:
+  needs: lint-dockerfile
+```
+ 
+The build job only runs if the lint job passes. There is no value in spending compute on a build if the Dockerfile has already been flagged as malformed.
+ 
+The build uses `docker/setup-buildx-action` and `docker/build-push-action`, which are the standard GitHub Actions for BuildKit builds. The alternative would be running `docker buildx build` directly in a shell step, but the Actions handle BuildKit initialisation, layer caching configuration, and multi-platform setup cleanly without boilerplate.
+ 
+`push: false` means the image is built and verified but not pushed to any registry. At this stage there is no registry configured — the build job exists to confirm the image compiles and layers correctly, not to produce a deployable artefact.
+ 
+The image is tagged with the full git commit SHA (`${{ github.sha }}`). This makes every build traceable back to the exact commit that produced it. In a production pipeline this tag would be what gets pushed to a registry and subsequently deployed.
