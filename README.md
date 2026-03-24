@@ -4,7 +4,7 @@ This repository contains a containerised Go web server and development documenta
 
 ## Repository layout
 
-- `README.md`: Developer usage documentation (this document)
+- `.github/workflows/ci.yaml`: GitHub CI pipeline configuration
 - `doc/contributing.md`: [Contributing guide](./doc/contributing.md)
 - `doc/docker.md`: [Docker feature development document](./doc/docker.md)
 - `doc/pipeline.md`: [CI feature development document](./doc/pipeline.md)
@@ -20,6 +20,8 @@ This repository contains a containerised Go web server and development documenta
 - `environment.sh`: Operational environment script to maintain DRY coding standards
 - `run.sh`: Operational run script for non-technical operators
 - `verify.sh`: Operational test script for non-technical operators
+- `README.md`: Developer usage documentation (this document)
+
 
 ## Prerequisites
 
