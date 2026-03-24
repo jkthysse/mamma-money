@@ -5,7 +5,7 @@ This repository contains a containerised Go web server and development documenta
 ## Repository Index
 
 - `.github/workflows/ci.yaml`: GitHub CI pipeline configuration
-- `doc/contributing.md`: [Contributing guide](./doc/contributing.md)
+- `doc/contributing.md`: [Contribution guidelines](./doc/contributing.md)
 - `doc/docker.md`: [Docker feature development document](./doc/docker.md)
 - `doc/helm.md`: [Helm feature development document](./doc/helm.md)
 - `doc/ops.md`: [Operations scripts and local k3d deployment](./doc/ops.md)
@@ -64,7 +64,7 @@ Commands in this repository are written for Bash.
 - See [Local k3d deployment](./README.md#operator-flow---deploy-to-local-k3d-cluster)
 - See [Helm deployment details](./doc/helm.md)
 - See [CI behaviour and trade-offs](./doc/pipeline.md)
-- See [Contribution workflow](./doc/contributing.md)
+- See [Contribution guidelines](./doc/contributing.md)
 
 ### Developer Flow - Run with Go:
 
@@ -118,9 +118,9 @@ bash ./mamma.sh down     # delete the cluster and free resources
 - `buildx` command unavailable  
   Ensure Docker Desktop is up to date and Buildx is enabled.
 
-## Notes for contributors
+## Notes for Contributors
 
 - Keep Docker build context scoped to `src` to avoid sending unnecessary files.
 - Maintain multi-stage build pattern and a non-root runtime image.
 - When adding dependencies, keep `go.mod` and `go.sum` in `src/app` updated.
-- See the [Contributing guide](./doc/contributing.md)
+- See the [Contribution guidelines](./doc/contributing.md)
