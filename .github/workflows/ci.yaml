@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint-helm:
-    name: Lint Helm chart
+    name: Lint Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,7 +39,7 @@ jobs:
           dockerfile: src/Dockerfile
 
   build:
-    name: Build Docker image
+    name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [lint-dockerfile, lint-helm]
     steps:
