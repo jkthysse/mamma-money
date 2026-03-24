@@ -12,7 +12,13 @@ Running on pull requests is where the pipeline earns its keep — it catches pro
 
 ```yaml
 lint-helm:
-  uses: azure/setup-helm@v4
+  name: Lint Helm Chart
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
 ```
 
 Helm provides first-class tooling for validating charts before they are applied to a cluster. The lint job runs three steps in sequence: `helm dependency build` to resolve the lib-common local dependency, `helm lint` to catch structural and schema errors, and `helm template` to render the chart to YAML and confirm the output is valid. A chart that passes all three is safe to deploy.
@@ -23,9 +29,16 @@ Helm provides first-class tooling for validating charts before they are applied 
 
 ```yaml
 lint-dockerfile:
-  uses: hadolint/hadolint-action@v3.1.0
-  with:
-    dockerfile: src/Dockerfile
+  name: Lint Dockerfile
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: src/Dockerfile
 ```
 
 Hadolint is a Dockerfile linter that checks for common mistakes and deviations from best practice — things like missing `--no-cache` on package installs, using `ADD` where `COPY` is sufficient, or running as root. It understands the Dockerfile syntax deeply enough to follow shell commands inside `RUN` instructions.

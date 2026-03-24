@@ -26,11 +26,13 @@ The server listens on `PORT` (defaults to `8080`) and exposes two endpoints:
 
 ## Local development
 
-Copy `.env.example` to `.env` and set your platform before running anything:
+Please check the project [README](../README.md) before running this solution.  Take special note of the following sections:
 
-```bash
-cp .env.example .env
-```
+- [Pre-requisites](../README.md#prerequisites)
+- [Operator Flow](../README.md#operator-flow---run-with-docker)
+- [First-run checklist](../README.md#first-run-checklist)
+- [Shell Compatibility](../README.md#shell-compatibility)
+- [Troubleshooting](../README.md#troubleshooting)
 
 The `PLATFORM` value in `.env` controls the build target. Set it to match your deployment target, not your local machine — if you are on Apple Silicon but deploying to x86, keep it as `linux/amd64`.
 
