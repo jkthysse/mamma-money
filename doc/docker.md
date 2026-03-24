@@ -4,11 +4,11 @@ The service is containerised using a multi-stage Docker build at `src/Dockerfile
 
 ## Repository layout
 
-The requirement spec places the Dockerfile, application code, and Helm charts at the repository root. This project deviates from that deliberately.
+The assessment specification lists Dockerfile and Helm/chart artefacts at repository root level. In this repository, equivalent artefacts are under `src/`, as provided in the starter structure.
 
-All source code — the Go application, the Dockerfile, and the Helm charts — lives under `src/`. The repository root is reserved for operations: shell scripts, environment configuration, and CI. This separation means a developer working on the application never needs to look past `src/`, and an operator running or deploying the service works entirely from the root without digging into application internals.
+All source code — Go application, Dockerfile, and Helm charts — lives under `src/`. The repository root is reserved for operations: shell scripts, environment configuration, and CI. This separation keeps application implementation and operational tooling clearly partitioned.
 
-The trade-off is a slight divergence from the spec's expected layout, which is documented here so it is clearly intentional rather than an oversight. The Docker build context is scoped to `src/` accordingly — `BUILD_CONTEXT=src` in `.env` — which also means the Dockerfile is found automatically without needing a `-f` flag.
+The trade-off is a layout difference from the specification examples, documented explicitly in this document. The Docker build context is scoped to `src/` (`BUILD_CONTEXT=src` in `ops/.env`), and the Dockerfile is referenced by `mamma.sh` during build execution.
 
 ## What the image provides
 
@@ -26,7 +26,7 @@ The server listens on `PORT` (defaults to `8080`) and exposes two endpoints:
 
 ## Local development
 
-Please check the project [README](../README.md) before running this solution.  Take special note of the following sections:
+Review [README](../README.md) before running local container workflows. Refer especially to:
 
 - [Pre-requisites](../README.md#prerequisites)
 - [Operator Flow](../README.md#operator-flow---run-with-docker)
@@ -34,17 +34,17 @@ Please check the project [README](../README.md) before running this solution.  T
 - [Shell Compatibility](../README.md#shell-compatibility)
 - [Troubleshooting](../README.md#troubleshooting)
 
-The `PLATFORM` value in `.env` controls the build target. Set it to match your deployment target, not your local machine — if you are on Apple Silicon but deploying to x86, keep it as `linux/amd64`.
+The `PLATFORM` value in `ops/.env` controls the build target and should match deployment architecture. Example: Apple Silicon development targeting x86 should keep `PLATFORM=linux/amd64`.
 
 ```bash
-bash ./build.sh   # builds and loads the image into your local Docker
-bash ./run.sh     # runs the container on port 8080
-bash ./verify.sh  # hits / and /healthz to confirm the container is up
+bash ./mamma.sh build   # builds and loads the image into local Docker
+bash ./mamma.sh run     # runs the container on port 8080
+bash ./mamma.sh verify  # hits / and /healthz to confirm the container is up
 ```
 
 ### Platform and cross-compilation
 
-The Dockerfile is set up for cross-compilation from the start. The builder stage always runs natively on your machine (`$BUILDPLATFORM`), and the Go compiler targets whatever `PLATFORM` you set in `.env` via `GOOS`/`GOARCH`. This means a Mac developer building `linux/amd64` for an x86 server compiles at native speed — no emulation.
+The Dockerfile is configured for cross-compilation. The builder stage runs on `$BUILDPLATFORM`, and the Go compiler targets `PLATFORM` from `ops/.env` via `GOOS`/`GOARCH`. This allows native-speed builds for cross-architecture targets without emulation.
 
 This matters when deploying to AWS Graviton (t4g, m7g, c7g instances), which are ARM-based and typically 20–40% cheaper than equivalent x86 instances. Setting `PLATFORM=linux/arm64` in `.env` produces a Graviton-compatible image from any machine without any other changes.
 
@@ -67,7 +67,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 ```
 
-`go.mod` and `go.sum` are copied before any application source so Docker can cache the dependency download as its own layer. If you change application code without touching dependencies, `go mod download` doesn't run again — it hits the layer cache. The `--mount=type=cache` goes further: it persists the module cache on disk across builds even when the layer cache is invalidated, so previously downloaded modules don't need to be re-fetched.
+`go.mod` and `go.sum` are copied before application source so Docker can cache dependency download as an independent layer. If application code changes without dependency changes, `go mod download` is skipped via layer cache. The `--mount=type=cache` further persists module cache across builds even when the layer cache is invalidated.
 
 `go.sum` is currently empty because this service has no external dependencies, but it needs to exist and be committed. The moment a dependency is added via `go get`, `go.sum` gets populated with checksums, and `go mod download` will fail in CI without it.
 
@@ -91,9 +91,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 The `--mount=type=cache` on the Go build cache means only changed packages are recompiled on subsequent builds. On larger codebases this is the difference between a 30-second rebuild and a 3-minute one.
 
-`-trimpath` removes local filesystem paths from the compiled binary. Without it, stack traces embed paths like `/home/username/project/...`, which leaks your build environment layout and makes builds non-reproducible across machines.
+`-trimpath` removes local filesystem paths from the compiled binary. Without it, stack traces can embed machine-specific paths and reduce reproducibility across build environments.
 
-`-ldflags="-s -w"` strips the symbol table (`-s`) and DWARF debug information (`-w`) from the binary. This typically reduces binary size by 20–30%. The cost is that you cannot attach a debugger like `delve` to a production build — which is the right trade-off. If you need to debug a production issue, reproduce it locally with these flags removed.
+`-ldflags="-s -w"` strips symbol table (`-s`) and DWARF debug information (`-w`). This typically reduces binary size by 20-30%. The trade-off is reduced runtime debuggability; local reproduction builds can omit these flags when deep debugging is required.
 
 The binary is written to `/out/server`, outside the source tree, so the `COPY` in the next stage has a clean, unambiguous target.
 
@@ -130,4 +130,4 @@ The array form (exec form) runs the binary directly as PID 1. The string form wo
 
 ## Design philosophy
 
-Every decision in this Dockerfile is pulled in the same direction: fast builds, small image, minimal attack surface. The main thing given up in exchange is runtime debuggability — you can't shell into the container, and the binary has no debug symbols. That's a deliberate trade-off. Production debugging should come from structured logs and traces built into the application, not from poking around inside a running container.
+The Dockerfile design optimizes for fast builds, small image size, and minimal runtime attack surface. The primary trade-off is reduced runtime debuggability: shell access is unavailable in distroless images and debug symbols are stripped. Production diagnostics are therefore expected to rely on application logs, metrics, and traces.
