@@ -1,4 +1,4 @@
-# Contributing
+# Contribution Guidelines
 
 ## Branching strategy
 
