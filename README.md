@@ -5,9 +5,10 @@ This repository contains a containerised Go web server and development documenta
 ## Repository layout
 
 - `README.md`: Developer usage documentation (this document)
-- `doc/requirement.md`: [Business requirement specification document](./doc/requirement.md)
-- `doc/docker.md`: [Docker feature development document](./doc/docker.md)
 - `doc/contributing.md`: [Contributing guide](./doc/contributing.md)
+- `doc/docker.md`: [Docker feature development document](./doc/docker.md)
+- `doc/pipeline.md`: [CI feature development document](./doc/pipeline.md)
+- `doc/requirement.md`: [Business requirement specification document](./doc/requirement.md)
 - `src/app`: Go application source code
 - `src/helm`: Helm templates provided
 - `src/.dockerignore`: Docker ignore file
