@@ -1,3 +1,11 @@
- #!/bin/bash
- 
-docker run --rm -p 8080:8080 hello-world:local
+#!/bin/bash
+
+source environment.sh
+
+echo "Running $IMAGE on $HOST:$PORT"
+
+docker run --rm \
+  --name "$CONTAINER_NAME" \
+  -p "$PORT:$PORT" \
+  -e PORT="$PORT" \
+  "$IMAGE"

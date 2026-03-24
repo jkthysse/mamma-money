@@ -1,4 +1,8 @@
- #!/bin/bash
- 
- curl http://localhost:8080/
-curl http://localhost:8080/healthz
+#!/bin/bash
+
+source environment.sh
+
+echo "Testing $IMAGE at http://$HOST:$PORT"
+
+curl "http://$HOST:$PORT/"
+curl "http://$HOST:$PORT/healthz"
