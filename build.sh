@@ -1,12 +1,19 @@
 #!/bin/bash
 set -e
 
-PLATFORM=${1:-linux/amd64}
-IMAGE=${2:-hello-world:local}
+if [[ ! -f .env ]]; then
+  echo "Error: .env not found. Copy .env.example and fill in the values:"
+  echo "  cp .env.example .env"
+  exit 1
+fi
+
+source .env
+
+echo "Building $IMAGE for $PLATFORM"
 
 docker buildx build \
-  --platform "$PLATFORM" \
-  -f src/Dockerfile \
-  -t "$IMAGE" \
+  --platform "${PLATFORM}" \
+  -t "${IMAGE}" \
+  --build-arg ENVIRONMENT="${ENVIRONMENT}" \
   --load \
-  src
+  "${BUILD_CONTEXT}"
