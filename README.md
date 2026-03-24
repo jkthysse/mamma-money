@@ -7,6 +7,7 @@ This repository contains a containerised Go web server and development documenta
 - `.github/workflows/ci.yaml`: GitHub CI pipeline configuration
 - `doc/contributing.md`: [Contributing guide](./doc/contributing.md)
 - `doc/docker.md`: [Docker feature development document](./doc/docker.md)
+- `doc/helm.md`: [Helm feature development document](./doc/helm.md)
 - `doc/pipeline.md`: [CI feature development document](./doc/pipeline.md)
 - `doc/requirement.md`: [Business requirement specification document](./doc/requirement.md)
 - `src/app`: Go application source code

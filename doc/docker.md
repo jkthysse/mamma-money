@@ -2,6 +2,14 @@
 
 The service is containerised using a multi-stage Docker build at `src/Dockerfile`. This document explains the architecture decisions and their trade-offs.
 
+## Repository layout
+
+The requirement spec places the Dockerfile, application code, and Helm charts at the repository root. This project deviates from that deliberately.
+
+All source code — the Go application, the Dockerfile, and the Helm charts — lives under `src/`. The repository root is reserved for operations: shell scripts, environment configuration, and CI. This separation means a developer working on the application never needs to look past `src/`, and an operator running or deploying the service works entirely from the root without digging into application internals.
+
+The trade-off is a slight divergence from the spec's expected layout, which is documented here so it is clearly intentional rather than an oversight. The Docker build context is scoped to `src/` accordingly — `BUILD_CONTEXT=src` in `.env` — which also means the Dockerfile is found automatically without needing a `-f` flag.
+
 ## What the image provides
 
 - A two-stage build that keeps the Go toolchain out of the final image entirely

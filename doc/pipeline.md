@@ -39,3 +39,13 @@ The build uses `docker/setup-buildx-action` and `docker/build-push-action`, whic
 `push: false` means the image is built and verified but not pushed to any registry. At this stage there is no registry configured — the build job exists to confirm the image compiles and layers correctly, not to produce a deployable artefact.
  
 The image is tagged with the full git commit SHA (`${{ github.sha }}`). This makes every build traceable back to the exact commit that produced it. In a production pipeline this tag would be what gets pushed to a registry and subsequently deployed.
+
+### Lint Helm chart
+ 
+This job will be added on the `jt/helm` branch alongside the Helm chart itself. The lint job depends on the chart existing — running `helm lint` against a path that doesn't exist fails immediately, so shipping the job and the chart in the same pull request keeps `main` green throughout.
+ 
+## Trade-offs
+ 
+Running CI on every pull request means developers get feedback quickly, but it also means every branch push consumes runner minutes. For a small team this is a non-issue, but it is worth knowing that the `pull_request` trigger fires on every push to the branch, not just when the PR is opened.
+ 
+The build job does not cache Docker layers between runs. BuildKit cache mounts work locally but GitHub Actions runners are ephemeral — each run starts fresh. Layer caching across runs is possible using `cache-from` and `cache-to` with GitHub's cache store, but adds complexity. For a build this fast it is not worth it yet.
