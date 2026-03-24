@@ -1,6 +1,6 @@
 # Production-ready deployment of containerised Go app
 
-This repository contains a simple Go web server and development documentation.
+This repository contains a containerised Go web server and development documentation.
 
 ## Repository layout
 
@@ -68,3 +68,4 @@ Smoke test:
 - Keep Docker build context scoped to `src` to avoid sending unnecessary files.
 - Maintain multi-stage build pattern and a non-root runtime image.
 - When adding dependencies, keep `go.mod` and `go.sum` in `src/app` updated.
+- See the [Contributing guide](./doc/contributing.md)
