@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mamma-money-api
+description: Helm chart for the mamma-money-api service
+type: application
+version: 0.1.0
+appVersion: "local"
+
+dependencies:
+  - name: lib-common
+    version: "0.1.0"
+    repository: "file://../lib-common"
