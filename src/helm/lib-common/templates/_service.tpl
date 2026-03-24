@@ -16,6 +16,9 @@ spec:
       targetPort: {{ .Values.service.targetPort | default 8080 }}
       protocol: TCP
       name: http
+      {{- if .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
   selector:
     {{- include "lib-common.selectorLabels" . | nindent 4 }}
 {{- end -}}

@@ -1,0 +1,19 @@
+# values.local.yaml — overrides for local k3d deployment
+# 
+# Usage:
+#   helm upgrade --install mamma-money-api src/helm/mamma-money-api \
+#     -f src/helm/mamma-money-api/values.local.yaml
+#
+# Notes:
+#   - pullPolicy: Never  → uses the locally imported image; no registry pull
+#   - service.type: NodePort with a fixed nodePort → stable host port via k3d
+#     port mapping (--port "8080:30080@agent:0" at cluster creation)
+
+image:
+  pullPolicy: Never
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 8080
+  nodePort: 30080

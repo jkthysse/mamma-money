@@ -129,6 +129,91 @@ do_verify() {
   fi
 }
 
+do_cluster() {
+  _require k3d "Install k3d: https://k3d.io"
+
+  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
+  local servers="${K3D_SERVERS:-1}"
+  local agents="${K3D_AGENTS:-0}"
+  local host_port="${K3D_HOST_PORT:-8080}"
+  local node_port="${K3D_NODE_PORT:-30080}"
+
+  if k3d cluster list | grep -q "^${cluster_name} "; then
+    _warn "Cluster '${cluster_name}' already exists — skipping creation."
+    return 0
+  fi
+
+  _step "Creating k3d cluster"
+  _dim  "name      : ${cluster_name}"
+  _dim  "servers   : ${servers}"
+  _dim  "agents    : ${agents}"
+  if [[ -n "${host_port}" ]]; then
+    _dim  "port      : host ${host_port} → node ${node_port}"
+  else
+    _dim  "port      : none (use kubectl port-forward)"
+  fi
+  _dim  "disabled  : traefik, metrics-server"
+  _divider
+
+  local port_args=()
+  if [[ -n "${host_port}" ]]; then
+    local target="server:0"
+    [[ "${agents}" -gt 0 ]] && target="agent:0"
+    port_args=(--port "${host_port}:${node_port}@${target}")
+  fi
+
+  k3d cluster create "${cluster_name}" \
+    --servers "${servers}" \
+    --agents "${agents}" \
+    "${port_args[@]}" \
+    --k3s-arg "--disable=traefik@server:0" \
+    --k3s-arg "--disable=metrics-server@server:0"
+
+  _ok "Cluster ready"
+}
+
+do_deploy() {
+  _require k3d  "Install k3d: https://k3d.io"
+  _require helm "Install Helm: https://helm.sh"
+
+  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
+  local chart="${SCRIPT_DIR}/src/helm/mamma-money-api"
+  local values_local="${chart}/values.local.yaml"
+
+  if ! k3d cluster list | grep -q "^${cluster_name} "; then
+    _err "Cluster '${cluster_name}' not found — run: bash ./mamma.sh cluster"
+    return 1
+  fi
+
+  _step "Importing image into k3d cluster"
+  _dim  "image   : ${IMAGE}"
+  _dim  "cluster : ${cluster_name}"
+  _divider
+  k3d image import "${IMAGE}" -c "${cluster_name}"
+
+  _step "Deploying Helm chart"
+  _dim  "chart   : ${chart}"
+  _dim  "values  : values.yaml + values.local.yaml"
+  _divider
+  helm dependency build "${chart}"
+  helm upgrade --install mamma-money-api "${chart}" \
+    -f "${values_local}"
+
+  _ok "Deployed — service reachable at ${BASE_URL} (via k3d NodePort)"
+}
+
+do_down() {
+  _require k3d "Install k3d: https://k3d.io"
+
+  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
+
+  _step "Deleting k3d cluster '${cluster_name}'"
+  _warn "This will remove the cluster and free all associated memory."
+  _divider
+  k3d cluster delete "${cluster_name}"
+  _ok "Cluster deleted"
+}
+
 show_help() {
   cat <<'EOF'
 Usage:
@@ -136,15 +221,18 @@ Usage:
   ./mamma.sh <command>
 
 Commands:
-  build    Build the Docker image
-  b        Alias for build
-  run      Run the Docker container (foreground)
-  r        Alias for run
-  verify   Smoke test / and /healthz
-  v        Alias for verify
-  all      Build then verify (expects container already running)
-  menu     Open interactive menu
-  help     Show this help
+  build     Build the Docker image
+  b         Alias for build
+  run       Run the Docker container (foreground)
+  r         Alias for run
+  verify    Smoke test / and /healthz
+  v         Alias for verify
+  all       Build then verify (expects container already running)
+  cluster   Create the local k3d cluster (idempotent)
+  deploy    Import image into k3d and install/upgrade Helm chart
+  down      Delete the k3d cluster and free resources
+  menu      Open interactive menu
+  help      Show this help
 EOF
 }
 
@@ -156,6 +244,10 @@ menu_main() {
     echo -e "  ${BOLD}3)${RESET} Verify"
     echo -e "  ${BOLD}4)${RESET} Build -> Verify"
     echo ""
+    echo -e "  ${BOLD}5)${RESET} Create k3d cluster"
+    echo -e "  ${BOLD}6)${RESET} Deploy to k3d"
+    echo -e "  ${BOLD}7)${RESET} Down k3d cluster"
+    echo ""
     echo -e "  ${BOLD}q)${RESET} Quit"
     echo ""
     echo -en "  ${BOLD}Choose: ${RESET}"
@@ -166,6 +258,9 @@ menu_main() {
       2) do_run; _pause ;;
       3) do_verify; _pause ;;
       4) do_build && do_verify; _pause ;;
+      5) do_cluster; _pause ;;
+      6) do_deploy; _pause ;;
+      7) do_down; _pause ;;
       q|Q)
         echo -e "\n${DIM}  Bye.${RESET}\n"
         exit 0
@@ -182,6 +277,9 @@ main() {
     run|r) do_run ;;
     verify|v) do_verify ;;
     all) do_build; do_verify ;;
+    cluster) do_cluster ;;
+    deploy) do_deploy ;;
+    down) do_down ;;
     menu) menu_main ;;
     help|-h|--help) show_help ;;
     *)
