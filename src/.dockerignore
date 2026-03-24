@@ -1,6 +1,18 @@
+# Git artifacts
+.git
+.gitignore
+
 # Local / editor artifacts
 .DS_Store
 Thumbs.db
 *.swp
 *.tmp
 .vscode
+
+# Build / test artifacts
+**/bin
+**/dist
+**/coverage
+
+# The helm charts
+helm/
