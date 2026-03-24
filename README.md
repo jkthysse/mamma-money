@@ -34,11 +34,8 @@ This repository contains a containerised Go web server and development documenta
 Copy the `.env.example` in the root of the project to `.env` and update the values to match your desired configuration.
 
 ## Shell compatibility
-Commands in this repository are written for Bash (`./build.sh`, `./run.sh`, `./verify.sh`).
-- Linux/macOS: use terminal as-is
-- Windows:
-  - Git Bash: run commands as written
-  - PowerShell: use `bash ./build.sh`, `bash ./run.sh`, `bash ./verify.sh`
+Commands in this repository are written for Bash.
+- Use `bash ./...` commands in Linux/macOS/PowerShell.
 
 ## Quick start
 
@@ -68,28 +65,22 @@ The app listens on `PORT` (default `8080`).
 
 Run these commands from the repository root.
 
-Build with Linux:
+Build:
 
 ```bash
-./build.sh
-```
-
-Build with PowerShell:
-
-```powershell
 bash ./build.sh
 ```
 
 Run:
 
 ```bash
-./run.sh
+bash ./run.sh
 ```
 
 Smoke test:
 
 ```bash
-./verify.sh
+bash ./verify.sh
 ```
 
 ## Troubleshooting

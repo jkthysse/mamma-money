@@ -37,9 +37,9 @@ Please check the project [README](../README.md) before running this solution.  T
 The `PLATFORM` value in `.env` controls the build target. Set it to match your deployment target, not your local machine — if you are on Apple Silicon but deploying to x86, keep it as `linux/amd64`.
 
 ```bash
-./build.sh   # builds and loads the image into your local Docker
-./run.sh     # runs the container on port 8080
-./verify.sh  # hits / and /healthz to confirm the container is up
+bash ./build.sh   # builds and loads the image into your local Docker
+bash ./run.sh     # runs the container on port 8080
+bash ./verify.sh  # hits / and /healthz to confirm the container is up
 ```
 
 ### Platform and cross-compilation
