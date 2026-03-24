@@ -15,6 +15,9 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +42,8 @@ jobs:
   lint-helm:
     name: Lint Helm Chart
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +63,9 @@ jobs:
   lint-dockerfile:
     name: Lint Dockerfile
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +88,8 @@ jobs:
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [codeql, lint-dockerfile, lint-helm]
     steps:
       - name: Checkout
