@@ -1,7 +1,12 @@
 #!/bin/bash
 # mamma.sh — unified operator script for mamma-money
+#
+# Usage:  bash ./mamma.sh <command>
+# Run without arguments to open the interactive menu.
 
 set -euo pipefail
+
+# ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_SCRIPT="${SCRIPT_DIR}/ops/environment.sh"
@@ -15,6 +20,8 @@ source "${ENV_SCRIPT}"
 
 DOCKERFILE="${DOCKERFILE:-src/Dockerfile}"
 BASE_URL="${HOST_PROTOCOL}://${HOST_SERVER_NAME}:${HOST_PORT}"
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
 
 BOLD="\033[1m"
 DIM="\033[2m"
@@ -38,7 +45,7 @@ _header() {
 
 _step()    { echo -e "\n${CYAN}▶  $*${RESET}"; }
 _ok()      { echo -e "${GREEN}✔  $*${RESET}"; }
-_err()     { echo -e "${RED}✘  $*${RESET}"; }
+_err()     { echo -e "${RED}✘  $*${RESET}" >&2; }
 _warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
 _dim()     { echo -e "${DIM}   $*${RESET}"; }
 _divider() { echo -e "${DIM}   ────────────────────────────────────${RESET}"; }
@@ -49,6 +56,9 @@ _pause() {
   read -r
 }
 
+# ─── Preflight helpers ────────────────────────────────────────────────────────
+
+# Abort if a required tool is missing.
 _require() {
   local cmd="$1" hint="${2:-}"
   if ! command -v "$cmd" &>/dev/null; then
@@ -57,6 +67,8 @@ _require() {
     return 1
   fi
 }
+
+# ─── Commands ─────────────────────────────────────────────────────────────────
 
 do_build() {
   _require docker "Install Docker Desktop and enable BuildKit"
@@ -103,10 +115,10 @@ do_verify() {
   _divider
 
   local all_ok=true
-  local status
 
   _check() {
     local path="$1" expected="${2:-200}"
+    local status
     status=$(curl -s -o /dev/null -w "%{http_code}" \
       --max-time 5 "${BASE_URL}${path}" 2>/dev/null || echo "000")
     if [[ "${status}" == "${expected}" ]]; then
@@ -217,6 +229,8 @@ do_down() {
   _ok "Cluster deleted"
 }
 
+# ─── Help ─────────────────────────────────────────────────────────────────────
+
 show_help() {
   cat <<'EOF'
 Usage:
@@ -239,6 +253,8 @@ Commands:
 EOF
 }
 
+# ─── Interactive menu ──────────────────────────────────────────────────────────
+
 menu_main() {
   while true; do
     _header
@@ -257,13 +273,13 @@ menu_main() {
     read -r choice
 
     case "${choice}" in
-      1) do_build; _pause ;;
-      2) do_run; _pause ;;
-      3) do_verify; _pause ;;
+      1) do_build;              _pause ;;
+      2) do_run;                _pause ;;
+      3) do_verify;             _pause ;;
       4) do_build && do_verify; _pause ;;
-      5) do_cluster; _pause ;;
-      6) do_deploy; _pause ;;
-      7) do_down; _pause ;;
+      5) do_cluster;            _pause ;;
+      6) do_deploy;             _pause ;;
+      7) do_down;               _pause ;;
       q|Q)
         echo -e "\n${DIM}  Bye.${RESET}\n"
         exit 0
@@ -273,18 +289,20 @@ menu_main() {
   done
 }
 
+# ─── Entry point ──────────────────────────────────────────────────────────────
+
 main() {
   local cmd="${1:-menu}"
   case "${cmd}" in
-    build|b) do_build ;;
-    run|r) do_run ;;
-    verify|v) do_verify ;;
-    all) do_build; do_verify ;;
-    cluster) do_cluster ;;
-    deploy) do_deploy ;;
-    down) do_down ;;
-    menu) menu_main ;;
-    help|-h|--help) show_help ;;
+    build|b)        do_build   ;;
+    run|r)          do_run     ;;
+    verify|v)       do_verify  ;;
+    all)            do_build; do_verify ;;
+    cluster)        do_cluster ;;
+    deploy)         do_deploy  ;;
+    down)           do_down    ;;
+    menu)           menu_main  ;;
+    help|-h|--help) show_help  ;;
     *)
       _err "Unknown command: ${cmd}"
       show_help
