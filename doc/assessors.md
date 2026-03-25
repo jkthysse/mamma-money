@@ -47,6 +47,20 @@ Trade-off note (why `.yaml`):
 
 Functionally, the workflow still runs as expected in GitHub, while preserving a consistent extension convention for local development.
 
+## Where this project can still improve
+
+- There is no unit testing for the core operational scripts, usually I follow TDD but I did not in this instance.  Writing tests for python would be easier that writing them for bash and so if I was to take this to production I would probably convert the mamma.sh to a python script, add pytest and possibly som pre-commit hooks.
+- Regression tests in the CI.  This is always nice to have but since the deployments wer focused on local, I stuck with the status checks and liveness probes.  
+- Remote deployment.  I instinctively wanted to write terraform code to throw this out to the cloud, several times but that would have been way out of scope and only useful as an extra. In production, that would be a hard requirement or at least multiple targets would be so thats a nice one for future work, should this code ever be extended.
+
+## Thank you
+
+I want to say thank you to the team at Mamma Money for giving me this opportunity and I look very much forward to discussing it further with you in person.
+
+Sincerely,
+
+[Jeán Thysse](https://www.thysse.org.za)
+
 ## See also
 
 - [Local k3d cluster workflow + embedded evidence images](ops.md)
