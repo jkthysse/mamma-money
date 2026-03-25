@@ -68,10 +68,40 @@ _require() {
   fi
 }
 
+# Abort if the Docker daemon is not reachable.
+_require_docker_daemon() {
+  if ! docker info &>/dev/null; then
+    _err "Docker daemon is not running or not reachable."
+    _dim "Start Docker Desktop (or the Docker service) and try again."
+    return 1
+  fi
+}
+
+# Abort if HOST_PORT is already bound on the host.
+_require_port_free() {
+  local port="${HOST_PORT}"
+  # Use ss if available (Linux), fall back to lsof (macOS/Linux).
+  if command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+      _err "Port ${port} is already in use."
+      _dim "Change HOST_PORT in ops/.env or stop the process using that port."
+      return 1
+    fi
+  elif command -v lsof &>/dev/null; then
+    if lsof -iTCP:"${port}" -sTCP:LISTEN &>/dev/null; then
+      _err "Port ${port} is already in use."
+      _dim "Change HOST_PORT in ops/.env or stop the process using that port."
+      return 1
+    fi
+  fi
+  # If neither tool is available we skip the check rather than blocking.
+}
+
 # ─── Commands ─────────────────────────────────────────────────────────────────
 
 do_build() {
   _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
 
   _step "Building image"
   _dim  "dockerfile : ${DOCKERFILE}"
@@ -94,6 +124,8 @@ do_build() {
 # run — foreground, container removed on exit (Ctrl+C).
 do_run() {
   _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
+  _require_port_free
 
   _step "Starting container (foreground)"
   _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
@@ -112,6 +144,8 @@ do_run() {
 # run-bg — detached; use `stop` to remove it.
 do_run_bg() {
   _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
+  _require_port_free
 
   _step "Starting container (detached)"
   _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
@@ -132,6 +166,7 @@ do_run_bg() {
 # stop — stops and removes the named container started by run-bg.
 do_stop() {
   _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
 
   _step "Stopping container '${CONTAINER_NAME}'"
   _divider
