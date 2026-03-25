@@ -5,7 +5,7 @@ This repository contains a containerised Go web server and development documenta
 ## Repository Index
 
 - `.github/workflows/ci.yaml`: GitHub CI pipeline configuration
-- `doc/assessors.md`: Evidence and deviation notes for assessors
+- `doc/assessors.md`: [Evidence and deviation notes for assessors](./doc/assessors.md)
 - `doc/contributing.md`: [Contribution Guidelines](./doc/contributing.md)
 - `doc/docker.md`: [Docker feature development documentation](./doc/docker.md)
 - `doc/helm.md`: [Helm feature development documentation](./doc/helm.md)
