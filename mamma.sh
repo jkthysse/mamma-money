@@ -14,7 +14,7 @@ fi
 source "${ENV_SCRIPT}"
 
 DOCKERFILE="${DOCKERFILE:-src/Dockerfile}"
-BASE_URL="http://${HOST}:${PORT}"
+BASE_URL="${HOST_PROTOCOL}://${HOST_SERVER_NAME}:${HOST_PORT}"
 
 BOLD="\033[1m"
 DIM="\033[2m"
@@ -32,7 +32,7 @@ _header() {
   echo "  ║          mamma-money  devtools       ║"
   echo "  ╚══════════════════════════════════════╝"
   echo -e "${RESET}"
-  echo -e "  ${DIM}Image:${RESET} ${IMAGE}   ${DIM}Port:${RESET} ${PORT}   ${DIM}Platform:${RESET} ${PLATFORM}"
+  echo -e "  ${DIM}Image:${RESET} ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}   ${DIM}Port:${RESET} ${HOST_PORT}   ${DIM}Platform:${RESET} ${TARGET_PLATFORM}"
   echo ""
 }
 
@@ -63,27 +63,27 @@ do_build() {
 
   _step "Building image"
   _dim  "dockerfile : ${DOCKERFILE}"
-  _dim  "context    : ${BUILD_CONTEXT}"
-  _dim  "platform   : ${PLATFORM}"
-  _dim  "tag        : ${IMAGE}"
+  _dim  "context    : ${DOCKER_BUILD_CONTEXT}"
+  _dim  "platform   : ${TARGET_PLATFORM}"
+  _dim  "tag        : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
   _divider
 
   docker buildx build \
-    --platform "${PLATFORM}" \
+    --platform "${TARGET_PLATFORM}" \
     -f "${DOCKERFILE}" \
-    -t "${IMAGE}" \
+    -t "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}" \
     --build-arg ENVIRONMENT="${ENVIRONMENT}" \
     --load \
-    "${BUILD_CONTEXT}"
+    "${DOCKER_BUILD_CONTEXT}"
 
-  _ok "Image ready: ${IMAGE}"
+  _ok "Image ready: ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
 do_run() {
   _require docker
 
   _step "Starting container"
-  _dim  "image : ${IMAGE}"
+  _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
   _dim  "url   : ${BASE_URL}"
   _divider
   _warn "Running in the foreground — press Ctrl+C to stop."
@@ -91,9 +91,9 @@ do_run() {
 
   docker run --rm \
     --name "${CONTAINER_NAME}" \
-    -p "${PORT}:${PORT}" \
-    -e PORT="${PORT}" \
-    "${IMAGE}"
+    -p "${HOST_PORT}:${HOST_PORT}" \
+    -e PORT="${HOST_PORT}" \
+    "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
 do_verify() {
@@ -132,11 +132,11 @@ do_verify() {
 do_cluster() {
   _require k3d "Install k3d: https://k3d.io"
 
-  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
-  local servers="${K3D_SERVERS:-1}"
-  local agents="${K3D_AGENTS:-0}"
-  local host_port="${K3D_HOST_PORT:-8080}"
-  local node_port="${K3D_NODE_PORT:-30080}"
+  local cluster_name="${CLUSTER_NAME:-mamma-money}"
+  local servers="${CLUSTER_SERVERS:-1}"
+  local agents="${CLUSTER_AGENTS:-0}"
+  local host_port="${HOST_PORT:-8080}"
+  local node_port="${NODE_PORT:-30080}"
 
   if k3d cluster list | grep -q "^${cluster_name} "; then
     _warn "Cluster '${cluster_name}' already exists — skipping creation."
@@ -176,9 +176,10 @@ do_deploy() {
   _require k3d  "Install k3d: https://k3d.io"
   _require helm "Install Helm: https://helm.sh"
 
-  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
+  local cluster_name="${CLUSTER_NAME:-mamma-money}"
   local chart="${SCRIPT_DIR}/src/helm/mamma-money-api"
   local values_local="${chart}/values.local.yaml"
+  local node_port="${NODE_PORT:-30080}"
 
   if ! k3d cluster list | grep -q "^${cluster_name} "; then
     _err "Cluster '${cluster_name}' not found — run: bash ./mamma.sh cluster"
@@ -186,26 +187,28 @@ do_deploy() {
   fi
 
   _step "Importing image into k3d cluster"
-  _dim  "image   : ${IMAGE}"
+  _dim  "image   : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
   _dim  "cluster : ${cluster_name}"
   _divider
-  k3d image import "${IMAGE}" -c "${cluster_name}"
+  k3d image import "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}" -c "${cluster_name}"
 
   _step "Deploying Helm chart"
-  _dim  "chart   : ${chart}"
-  _dim  "values  : values.yaml + values.local.yaml"
+  _dim  "chart     : ${chart}"
+  _dim  "values    : values.yaml + values.local.yaml"
+  _dim  "node port : ${node_port}"
   _divider
   helm dependency build "${chart}"
   helm upgrade --install mamma-money-api "${chart}" \
-    -f "${values_local}"
-
-  _ok "Deployed — service reachable at ${BASE_URL} (via k3d NodePort)"
+    -f "${values_local}" \
+    --set service.nodePort="${node_port}" \
+    --set image.tag="${DOCKER_IMAGE_TAG}"
+  _ok "Deployed — service reachable at ${BASE_URL}"
 }
 
 do_down() {
   _require k3d "Install k3d: https://k3d.io"
 
-  local cluster_name="${K3D_CLUSTER_NAME:-mamma-money}"
+  local cluster_name="${CLUSTER_NAME:-mamma-money}"
 
   _step "Deleting k3d cluster '${cluster_name}'"
   _warn "This will remove the cluster and free all associated memory."
