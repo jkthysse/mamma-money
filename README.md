@@ -82,6 +82,8 @@ bash ./mamma.sh build
 bash ./mamma.sh b
 bash ./mamma.sh run
 bash ./mamma.sh r
+bash ./mamma.sh run-bg
+bash ./mamma.sh stop
 bash ./mamma.sh verify
 bash ./mamma.sh v
 bash ./mamma.sh all
@@ -101,6 +103,7 @@ For local Kubernetes deployment. See [Operations documentation](./doc/ops.md) fo
 bash ./mamma.sh cluster  # create the cluster (once)
 bash ./mamma.sh build    # build the image
 bash ./mamma.sh deploy   # import image and install Helm chart
+bash ./mamma.sh status  # node/pod/service health for the cluster
 bash ./mamma.sh verify   # smoke test (same as Docker)
 bash ./mamma.sh down     # delete the cluster and free resources
 ```
@@ -110,7 +113,7 @@ bash ./mamma.sh down     # delete the cluster and free resources
 - `Error: .env not found`  
   Create `ops/.env` from `ops/.env.example`.
 - `bind: address already in use`  
-  Change `HOST_PORT` in `ops/.env` or stop the process using that port.
+  `mamma.sh` runs preflight checks before `run` / `run-bg` / `build` and will fail fast when `HOST_PORT` is already bound. Update `HOST_PORT` in `ops/.env` or stop the process using that port.
 - `buildx` command unavailable  
   Ensure Docker Desktop is up to date and Buildx is enabled.
 

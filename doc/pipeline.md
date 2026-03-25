@@ -10,6 +10,16 @@ Running on pull requests catches issues before merge to `main`. Running on pushe
 
 The workflow declares `contents: read`, `actions: read`, and `security-events: write`. The last permission allows CodeQL analysis and SARIF uploads (Hadolint code-quality results) to be written to GitHub’s security and code-quality surfaces, which branch protection rules can then enforce.
 
+## CI Structured Logging (`CI=true`)
+
+GitHub Actions sets `CI=true` automatically in the runner environment.
+When you invoke `mamma.sh` in a pipeline step (for example, running container smoke tests), `mamma.sh` switches into structured plain-text logging mode:
+
+- No ANSI colour / no Unicode box-drawing characters
+- Each log line is prefixed with a level tag like `[INFO]`, `[OK]`, `[WARN]`, or `[ERROR]`
+
+That makes it easy to scan the Actions log stream and grep for outcomes when debugging.
+
 ## Jobs
 
 ### CodeQL analysis

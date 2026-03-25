@@ -41,8 +41,12 @@ The `TARGET_PLATFORM` value in `ops/.env` controls the build target and should m
 ```bash
 bash ./mamma.sh build   # builds and loads the image into local Docker
 bash ./mamma.sh run     # runs the container on port 8080
+bash ./mamma.sh run-bg # runs the container detached (use `stop` to remove it)
+bash ./mamma.sh stop   # stops and removes the detached container
 bash ./mamma.sh verify  # hits / and /healthz to confirm the container is up
 ```
+
+When running in CI / automation, `mamma.sh` switches to structured plain-text logging (`CI=true`, set automatically by GitHub Actions). You will see log lines prefixed with `[INFO]`, `[OK]`, `[WARN]`, and `[ERROR]` (no ANSI colour / Unicode box characters).
 
 <img src="img/docker_containers.png" alt="Local Docker containers evidence" width="800" style="height:auto;" />
 
