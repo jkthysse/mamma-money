@@ -19,8 +19,8 @@ With the default configuration, `HOST_PORT=8080`, so the screenshots below demon
 
 To reproduce the assessment's exact `8081` URLs, set `HOST_PORT=8081` in `ops/.env` and keep `NODE_PORT` consistent (it is injected into Helm at deploy time via `--set service.nodePort=...` in `mamma.sh`). Then rerun `cluster`, `deploy`, and `verify`.
 
-![k3d verify evidence](./img/cluster_verify.png)
-![kubectl resource checks](./img/kubectl_checks.png)
+<img src="img/cluster_verify.png" alt="Cluster verification" width="800" style="height:auto;" />
+<img src="img/kubectl_checks.png" alt="Kubectl checks" width="800" style="height:auto;" />
 
 ## Repo layout deviation: Dockerfile/Helm under `src/` instead of repository root
 
@@ -51,3 +51,7 @@ Functionally, the workflow still runs as expected in GitHub, while preserving a 
 - [Local k3d cluster workflow + embedded evidence images](ops.md)
 - [Docker build/run/verify documentation + embedded evidence images](docker.md)
 - [Project entry point used for navigation and onboarding](../README.md)
+
+## Requirement alignment
+
+<img src="img/requirement_alignment.svg" alt="Requirement alignment" width="800" style="height:auto;" />

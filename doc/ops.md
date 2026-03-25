@@ -146,19 +146,19 @@ bash ./mamma.sh down
 
 **1) Cluster creation (`bash ./mamma.sh cluster`)**
 
-![k3d cluster created](./img/cluster_create.png)
+<img src="img/cluster_create.png" alt="K3d cluster created" width="800" style="height:auto;" />
 
 **2) Build + deploy (`bash ./mamma.sh build` + `bash ./mamma.sh deploy`)**
 
-![k3d cluster build output](./img/cluster_build.png)
+<img src="img/cluster_build.png" alt="K3d cluster build output" width="800" style="height:auto;" />
 
-![Helm deploy into the cluster](./img/cluster_deploy.png)
+<img src="img/cluster_deploy.png" alt="Helm deploy into the cluster" width="800" style="height:auto;" />
 
 **3) Verify + kubectl checks (`bash ./mamma.sh verify`)**
 
-![k3d verify results](./img/cluster_verify.png)
+<img src="img/cluster_verify.png" alt="K3d verify results" width="800" style="height:auto;" />
 
-![kubectl preflight and checks](./img/kubectl_checks.png)
+<img src="img/kubectl_checks.png" alt="Kubectl preflight and checks" width="800" style="height:auto;" />
 
 ### Cluster configuration
 
