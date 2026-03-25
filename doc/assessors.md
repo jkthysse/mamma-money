@@ -19,8 +19,9 @@ With the default configuration, `HOST_PORT=8080`, so the screenshots below demon
 
 To reproduce the assessment's exact `8081` URLs, set `HOST_PORT=8081` in `ops/.env` and keep `NODE_PORT` consistent (it is injected into Helm at deploy time via `--set service.nodePort=...` in `mamma.sh`). Then rerun `cluster`, `deploy`, and `verify`.
 
-<img src="img/cluster_verify.png" alt="Cluster verification" width="800" style="height:auto;" />
-<img src="img/kubectl_checks.png" alt="Kubectl checks" width="800" style="height:auto;" />
+<img src="img/cluster_verify.png" alt="Cluster successfully verified" width="800" style="height:auto;" />
+
+<img src="img/kubectl_checks.png" alt="Successful Kubectl checks" width="800" style="height:auto;" />
 
 ## Repo layout deviation: Dockerfile/Helm under `src/` instead of repository root
 
