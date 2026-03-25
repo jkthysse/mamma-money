@@ -19,8 +19,9 @@ With the default configuration, `HOST_PORT=8080`, so the screenshots below demon
 
 To reproduce the assessment's exact `8081` URLs, set `HOST_PORT=8081` in `ops/.env` and keep `NODE_PORT` consistent (it is injected into Helm at deploy time via `--set service.nodePort=...` in `mamma.sh`). Then rerun `cluster`, `deploy`, and `verify`.
 
-<img src="img/cluster_verify.png" alt="Cluster verification" width="800" style="height:auto;" />
-<img src="img/kubectl_checks.png" alt="Kubectl checks" width="800" style="height:auto;" />
+<img src="img/cluster_verify.png" alt="Cluster successfully verified" width="800" style="height:auto;" />
+
+<img src="img/kubectl_checks.png" alt="Successful Kubectl checks" width="800" style="height:auto;" />
 
 ## Repo layout deviation: Dockerfile/Helm under `src/` instead of repository root
 
@@ -45,6 +46,20 @@ Trade-off note (why `.yaml`):
 - Helm chart tooling in this repo is authored and documented using `.yaml`-suffixed template/values files; using `.yml` would introduce an extension mismatch against that local convention.
 
 Functionally, the workflow still runs as expected in GitHub, while preserving a consistent extension convention for local development.
+
+## Where this project can still improve
+
+- There is no unit testing for the core operational scripts, usually I follow TDD but I did not in this instance.  Writing tests for python would be easier that writing them for bash and so if I was to take this to production I would probably convert the mamma.sh to a python script, add pytest and possibly som pre-commit hooks.
+- Regression tests in the CI.  This is always nice to have but since the deployments wer focused on local, I stuck with the status checks and liveness probes.  
+- Remote deployment.  I instinctively wanted to write terraform code to throw this out to the cloud, several times but that would have been way out of scope and only useful as an extra. In production, that would be a hard requirement or at least multiple targets would be so thats a nice one for future work, should this code ever be extended.
+
+## Thank you
+
+I want to say thank you to the team at Mamma Money for giving me this opportunity and I look very much forward to discussing it further with you in person.
+
+Sincerely,
+
+[Jeán Thysse](https://www.thysse.org.za)
 
 ## See also
 

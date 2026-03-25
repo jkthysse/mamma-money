@@ -19,11 +19,14 @@ The current ops workflow is structured as follows:
 4. `mamma.sh` dispatches to a command handler:
    - `build|b`
    - `run|r`
+   - `run-bg`
+   - `stop`
    - `verify|v`
    - `all`
    - `cluster`
    - `deploy`
    - `down`
+   - `status`
    - `menu`
 5. The handler runs Docker/curl operations using configuration loaded from `ops/.env`.
 
@@ -89,6 +92,58 @@ The command was renamed from `teardown` to `down` for brevity and consistency wi
 
 Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` variables rather than hardcoded in the script. This allows developers on different machines to tune their local setup without modifying shared code. All variables have defaults that produce a working minimal cluster out of the box, so no configuration is required for a standard setup.
 
+### 12) Human-readable script structure
+
+`mamma.sh` uses named logging helpers (`_step`, `_ok`, `_err`, `_warn`, `_dim`, `_divider`, `_pause`) in place of bare `echo` calls throughout all command functions. All output flows through these helpers, which means a single `if [[ CI == true ]]` block at the top of the script is sufficient to switch the entire output mode — no command function needs to know whether it is running interactively or in a pipeline.
+
+Section dividers (`# ─── Name ───`) break the script into clearly labelled regions (Bootstrap, Logging, Preflight helpers, Commands, Help, Interactive menu, Entry point), making it easier to navigate without an IDE.
+
+The trade-off is a small indirection cost: contributors adding new commands must use the logging helpers rather than calling `echo` directly, and `_pause` / `_header` are no-ops in CI that exist solely to satisfy the interactive code path cleanly.
+
+### 13) `run-bg` and `stop` as a paired detached lifecycle
+
+`run` attaches to the container in the foreground and uses `--rm` so the container is automatically removed when the process exits. This is appropriate for interactive use but blocks the terminal and does not compose well with multi-step scripted workflows.
+
+`run-bg` runs the container detached (`docker run -d`) without `--rm`. The container is named `${CONTAINER_NAME}` explicitly so that the paired `stop` command has a stable, unambiguous target. `stop` checks whether the named container is actually running before calling `docker stop` and `docker rm`, emitting an idempotent warning rather than an error if the container is already gone — important for scripts that may call `stop` defensively as a cleanup step.
+
+The `--rm` flag is intentionally absent from `run-bg`: `--rm` causes Docker to remove the container immediately on exit, which would race with `stop` and make the command unreliable. The container therefore persists until `stop` is called explicitly.
+
+Both commands appear in the dispatcher, the interactive menu, and the help text so the lifecycle is discoverable from all entry points.
+
+### 14) Preflight checks before `run`, `run-bg`, and `build`
+
+Two preflight helpers gate the commands that require a working Docker environment:
+
+`_require_docker_daemon` calls `docker info` and exits early with a clear error if the daemon is unreachable. Without this check, a missing daemon produces a generic Docker error mid-command that is harder to act on than "Start Docker Desktop and try again."
+
+`_require_port_free` probes `HOST_PORT` before starting a container, avoiding the cryptic `bind: address already in use` error that Docker emits when a port is already occupied. The implementation tries `ss` first (available on Linux) and falls back to `lsof` (available on macOS). If neither tool is present the check is skipped rather than blocking — this is a deliberate portability trade-off: failing hard on a missing `ss`/`lsof` would break the script on stripped environments where those tools are not installed.
+
+Both helpers are called from `do_build`, `do_run`, and `do_run_bg`. Adding them to `build` means a failed daemon is caught before a potentially long build rather than only at the subsequent `run`.
+
+### 15) Structured log output for CI
+
+Most CI platforms (GitHub Actions, CircleCI, GitLab CI, Jenkins) set `CI=true` in the build environment automatically. `mamma.sh` reads `CI="${CI:-false}"` at startup and branches the entire logging layer on that value.
+
+In CI mode all logging helpers emit plain text with `[INFO]`, `[OK]`, `[ERROR]`, and `[WARN]` level prefixes, no ANSI escape codes, and no Unicode box-drawing characters. `_divider`, `_header`, and `_pause` become no-ops — `_header` clears the screen and renders a decorative box that is meaningless in a log stream, and `_pause` waits for user input that will never arrive. Neither call needs to be removed from command functions; they simply do nothing in CI context.
+
+Because all command functions write output exclusively through these helpers, no command function contains any CI-specific branching. The same `do_build` (for example) works correctly for both a developer at a terminal and a CI runner.
+
+The trade-off is that contributors adding new commands must use the helpers rather than calling `echo` directly, which is a small convention overhead. The benefit is that CI compatibility is structural rather than incidental — it cannot be accidentally broken by a new command that uses `echo` with ANSI codes.
+
+### 16) `status` command for cluster and pod health visibility
+
+The raw output of `kubectl get nodes`, `kubectl get pods`, and `kubectl get svc` is wide, multi-column, and difficult to scan at a glance, particularly when multiple namespaces and system pods are present alongside application workloads.
+
+`do_status` reformats each resource type with `awk` into a consistent fixed-width layout and prepends a `✔` or `✘` icon based on the resource's reported state. Three resource types are surfaced deliberately:
+
+- **Nodes** — confirm the cluster plane is healthy before drawing conclusions about pods.
+- **Pods (all namespaces)** — surface both application and system pod state. Restart count is included because a pod that is `Running` but has restarted repeatedly is not healthy in any operational sense; the raw status field alone would hide this.
+- **Services** — confirm the service is registered and exposing the expected port, catching cases where a Helm deployment succeeded but the service configuration is wrong.
+
+All `kubectl` calls pin `--context k3d-${cluster_name}` explicitly. This ensures `status` targets the correct cluster on machines with multiple kubeconfig contexts — without the flag, `kubectl` would silently query whichever context is currently active, which may not be the local k3d cluster.
+
+The `awk` formatting is human-readable but not machine-parseable. In CI contexts where structured pod status is needed, `kubectl` should be called directly with `-o json` or `-o jsonpath`.
+
 ## Trade-offs
 
 ### Benefits
@@ -97,9 +152,11 @@ Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` 
 - **Maintainability:** Reduced script duplication and centralised change management.
 - **Usability:** Supports both scripted and interactive operation from the same entrypoint.
 - **Robustness:** Path-safe config loading, fail-fast shell mode, and preflight checks surface problems early.
-- **Portability:** Works on Linux, macOS, and WSL2 without modification.
+- **Portability:** Works on Linux, macOS, and WSL2 without modification. Port-check falls back gracefully when `ss`/`lsof` are unavailable.
 - **Local parity:** Fixed port mapping means `verify` behaves identically against Docker and k3d.
 - **Single source of truth for ports:** `HOST_PORT` and `NODE_PORT` are the only values to change when reconfiguring ports — no duplication, no silent mismatches.
+- **CI compatibility is structural:** output mode is determined once at startup; individual commands contain no CI-specific branching and cannot accidentally break it.
+- **Detached lifecycle is explicit:** `run-bg` and `stop` form a complete, discoverable pair with clear container-naming semantics.
 
 ### Costs / limitations
 
@@ -109,6 +166,8 @@ Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` 
 - **k3d port conflict risk:** The fixed `NODE_PORT` could conflict with another service in the cluster, though this is unlikely in a minimal local setup.
 - **`values.local.yaml` is committed:** Local override values are visible in the repository, which is intentional for transparency but means the file should never contain secrets.
 - **`HOST_PORT` / app `PORT` indirection:** The mapping between `HOST_PORT` (operator config) and `PORT` (app env var) is implicit in `mamma.sh`. A developer reading the Dockerfile or Go source will see `PORT`; a developer reading `ops/.env` will see `HOST_PORT`. This is documented but adds a small cognitive overhead.
+- **Logging helper convention:** Contributors must use `_step`/`_ok`/`_err` etc. rather than bare `echo` calls. A command that writes directly to stdout will bypass CI mode and emit ANSI codes in log output.
+- **`status` output is human-readable only:** the `awk`-formatted node/pod/service tables are not machine-parseable. CI workflows that need structured cluster state should call `kubectl` directly with `-o json` or `-o jsonpath`.
 
 ## Operational guidance
 
@@ -120,6 +179,11 @@ Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` 
   - `bash ./mamma.sh b`
   - `bash ./mamma.sh r`
   - `bash ./mamma.sh v`
+- For scripted or background workflows:
+  - `bash ./mamma.sh run-bg` — start the container detached
+  - `bash ./mamma.sh stop`   — stop and remove it
+- To inspect cluster health after a k3d deployment:
+  - `bash ./mamma.sh status`
 
 ## Local k3d deployment (WSL2)
 
@@ -146,19 +210,19 @@ bash ./mamma.sh down
 
 **1) Cluster creation (`bash ./mamma.sh cluster`)**
 
-![k3d cluster created](./img/cluster_create.png)
+<img src="img/cluster_create.png" alt="Successful cluster creation" width="800" style="height:auto;" />
 
 **2) Build + deploy (`bash ./mamma.sh build` + `bash ./mamma.sh deploy`)**
 
-![k3d cluster build output](./img/cluster_build.png)
+<img src="img/cluster_build.png" alt="Successful cluster build run" width="800" style="height:auto;" />
 
-![Helm deploy into the cluster](./img/cluster_deploy.png)
+<img src="img/cluster_deploy.png" alt="Successful Helm deployment" width="800" style="height:auto;" />
 
 **3) Verify + kubectl checks (`bash ./mamma.sh verify`)**
 
-![k3d verify results](./img/cluster_verify.png)
+<img src="img/cluster_verify.png" alt="Cluster successfully verified" width="800" style="height:auto;" />
 
-![kubectl preflight and checks](./img/kubectl_checks.png)
+<img src="img/kubectl_checks.png" alt="Successful Kubectl checks" width="800" style="height:auto;" />
 
 ### Cluster configuration
 
@@ -191,9 +255,3 @@ The port mapping means `verify` works identically against both Docker and k3d wi
 `service.nodePort` is not hardcoded in `values.local.yaml`. It is injected dynamically at deploy time from `NODE_PORT` in `ops/.env` via `--set service.nodePort`. This ensures the node port is always consistent with the cluster port mapping without requiring manual edits to committed files.
 
 The base `values.yaml` is unchanged and remains valid for non-local environments.
-
-## Future considerations
-
-- Add a dedicated `run-bg` command for detached execution and a paired `stop` command.
-- Add preflight checks (port availability, Docker daemon status) before `run`.
-- Add optional structured logging mode for non-interactive script usage in CI.

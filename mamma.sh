@@ -1,7 +1,12 @@
 #!/bin/bash
 # mamma.sh — unified operator script for mamma-money
+#
+# Usage:  bash ./mamma.sh <command>
+# Run without arguments to open the interactive menu.
 
 set -euo pipefail
+
+# ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_SCRIPT="${SCRIPT_DIR}/ops/environment.sh"
@@ -16,39 +21,61 @@ source "${ENV_SCRIPT}"
 DOCKERFILE="${DOCKERFILE:-src/Dockerfile}"
 BASE_URL="${HOST_PROTOCOL}://${HOST_SERVER_NAME}:${HOST_PORT}"
 
-BOLD="\033[1m"
-DIM="\033[2m"
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-YELLOW="\033[0;33m"
-BLUE="\033[0;34m"
-CYAN="\033[0;36m"
-RESET="\033[0m"
+# ─── Logging ─────────────────────────────────────────────────────────────────
+# CI=true (set automatically by GitHub Actions and most CI platforms) activates
+# structured log mode: plain text, no ANSI colour, no Unicode box-drawing, and
+# every line is prefixed with a log-level tag so it is easy to grep or parse.
+# Interactive mode uses colour and symbols for readability.
 
-_header() {
-  clear
-  echo -e "${BOLD}${BLUE}"
-  echo "  ╔══════════════════════════════════════╗"
-  echo "  ║          mamma-money  devtools       ║"
-  echo "  ╚══════════════════════════════════════╝"
-  echo -e "${RESET}"
-  echo -e "  ${DIM}Image:${RESET} ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}   ${DIM}Port:${RESET} ${HOST_PORT}   ${DIM}Platform:${RESET} ${TARGET_PLATFORM}"
-  echo ""
-}
+CI="${CI:-false}"
 
-_step()    { echo -e "\n${CYAN}▶  $*${RESET}"; }
-_ok()      { echo -e "${GREEN}✔  $*${RESET}"; }
-_err()     { echo -e "${RED}✘  $*${RESET}"; }
-_warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
-_dim()     { echo -e "${DIM}   $*${RESET}"; }
-_divider() { echo -e "${DIM}   ────────────────────────────────────${RESET}"; }
+if [[ "${CI}" == "true" ]]; then
+  _step()    { echo "[INFO]  $*"; }
+  _ok()      { echo "[OK]    $*"; }
+  _err()     { echo "[ERROR] $*" >&2; }
+  _warn()    { echo "[WARN]  $*"; }
+  _dim()     { echo "[INFO]  $*"; }
+  _divider() { :; }
+  _header()  { :; }
+  _pause()   { :; }
+else
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  RED="\033[0;31m"
+  GREEN="\033[0;32m"
+  YELLOW="\033[0;33m"
+  BLUE="\033[0;34m"
+  CYAN="\033[0;36m"
+  RESET="\033[0m"
 
-_pause() {
-  echo ""
-  echo -en "${DIM}   Press Enter to return to the menu...${RESET}"
-  read -r
-}
+  _header() {
+    clear
+    echo -e "${BOLD}${BLUE}"
+    echo "  ╔══════════════════════════════════════╗"
+    echo "  ║          mamma-money  devtools       ║"
+    echo "  ╚══════════════════════════════════════╝"
+    echo -e "${RESET}"
+    echo -e "  ${DIM}Image:${RESET} ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}   ${DIM}Port:${RESET} ${HOST_PORT}   ${DIM}Platform:${RESET} ${TARGET_PLATFORM}"
+    echo ""
+  }
 
+  _step()    { echo -e "\n${CYAN}▶  $*${RESET}"; }
+  _ok()      { echo -e "${GREEN}✔  $*${RESET}"; }
+  _err()     { echo -e "${RED}✘  $*${RESET}" >&2; }
+  _warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
+  _dim()     { echo -e "${DIM}   $*${RESET}"; }
+  _divider() { echo -e "${DIM}   ────────────────────────────────────${RESET}"; }
+
+  _pause() {
+    echo ""
+    echo -en "${DIM}   Press Enter to return to the menu...${RESET}"
+    read -r
+  }
+fi
+
+# ─── Preflight helpers ────────────────────────────────────────────────────────
+
+# Abort if a required tool is missing.
 _require() {
   local cmd="$1" hint="${2:-}"
   if ! command -v "$cmd" &>/dev/null; then
@@ -58,8 +85,40 @@ _require() {
   fi
 }
 
+# Abort if the Docker daemon is not reachable.
+_require_docker_daemon() {
+  if ! docker info &>/dev/null; then
+    _err "Docker daemon is not running or not reachable."
+    _dim "Start Docker Desktop (or the Docker service) and try again."
+    return 1
+  fi
+}
+
+# Abort if HOST_PORT is already bound on the host.
+_require_port_free() {
+  local port="${HOST_PORT}"
+  # Use ss if available (Linux), fall back to lsof (macOS/Linux).
+  if command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+      _err "Port ${port} is already in use."
+      _dim "Change HOST_PORT in ops/.env or stop the process using that port."
+      return 1
+    fi
+  elif command -v lsof &>/dev/null; then
+    if lsof -iTCP:"${port}" -sTCP:LISTEN &>/dev/null; then
+      _err "Port ${port} is already in use."
+      _dim "Change HOST_PORT in ops/.env or stop the process using that port."
+      return 1
+    fi
+  fi
+  # If neither tool is available we skip the check rather than blocking.
+}
+
+# ─── Commands ─────────────────────────────────────────────────────────────────
+
 do_build() {
-  _require docker "Install Docker Desktop and enable BuildKit"
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
 
   _step "Building image"
   _dim  "dockerfile : ${DOCKERFILE}"
@@ -79,10 +138,13 @@ do_build() {
   _ok "Image ready: ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
+# run — foreground, container removed on exit (Ctrl+C).
 do_run() {
-  _require docker
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
+  _require_port_free
 
-  _step "Starting container"
+  _step "Starting container (foreground)"
   _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
   _dim  "url   : ${BASE_URL}"
   _divider
@@ -96,17 +158,57 @@ do_run() {
     "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
+# run-bg — detached; use `stop` to remove it.
+do_run_bg() {
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon 
+  _require_port_free
+
+  _step "Starting container (detached)"
+  _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
+  _dim  "url   : ${BASE_URL}"
+  _dim  "name  : ${CONTAINER_NAME}"
+  _divider
+
+  docker run -d \
+    --name "${CONTAINER_NAME}" \
+    -p "${HOST_PORT}:${HOST_PORT}" \
+    -e PORT="${HOST_PORT}" \
+    "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
+
+  _ok "Container started. Run 'bash ./mamma.sh verify' to check endpoints."
+  _ok "Run 'bash ./mamma.sh stop' to remove it."
+}
+
+# stop — stops and removes the named container started by run-bg.
+do_stop() {
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+  _require_docker_daemon
+
+  _step "Stopping container '${CONTAINER_NAME}'"
+  _divider
+
+  if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+    _warn "Container '${CONTAINER_NAME}' is not running — nothing to stop."
+    return 0
+  fi
+
+  docker stop "${CONTAINER_NAME}"
+  docker rm   "${CONTAINER_NAME}" 2>/dev/null || true
+  _ok "Container stopped and removed."
+}
+
 do_verify() {
-  _require curl
+  _require curl "Install Curl: https://curl.se/"
 
   _step "Verifying endpoints at ${BASE_URL}"
   _divider
 
   local all_ok=true
-  local status
 
   _check() {
     local path="$1" expected="${2:-200}"
+    local status
     status=$(curl -s -o /dev/null -w "%{http_code}" \
       --max-time 5 "${BASE_URL}${path}" 2>/dev/null || echo "000")
     if [[ "${status}" == "${expected}" ]]; then
@@ -217,39 +319,109 @@ do_down() {
   _ok "Cluster deleted"
 }
 
+# status — quick node and pod health overview for the k3d cluster.
+do_status() {
+  _require kubectl "Install kubectl: https://kubernetes.io/docs/tasks/tools/"
+
+  local cluster_name="${CLUSTER_NAME:-mamma-money}"
+  local context="k3d-${cluster_name}"
+
+  _step "Cluster status: ${cluster_name}"
+  _divider
+
+  if ! kubectl --context "${context}" cluster-info &>/dev/null; then
+    _err "Cannot reach cluster '${cluster_name}'. Is it running? (bash ./mamma.sh cluster)"
+    return 1
+  fi
+
+  _dim "Nodes"
+  kubectl --context "${context}" get nodes \
+    -o wide \
+    --no-headers \
+    | awk '{
+        status = $2; name = $1; role = $3; version = $5; os = $9
+        icon = (status == "Ready") ? "✔" : "✘"
+        printf "   %s  %-28s  %-12s  %-8s  %s\n", icon, name, role, status, version
+      }'
+
+  echo ""
+  _dim "Pods (all namespaces)"
+  kubectl --context "${context}" get pods \
+    --all-namespaces \
+    --no-headers \
+    | awk '{
+        ns = $1; name = $2; ready = $3; status = $4; restarts = $5
+        icon = (status == "Running" || status == "Completed") ? "✔" : "✘"
+        printf "   %s  %-20s  %-36s  %-12s  ready: %s  restarts: %s\n", \
+          icon, ns, name, status, ready, restarts
+      }'
+
+  echo ""
+  _dim "Services"
+  kubectl --context "${context}" get svc \
+    --all-namespaces \
+    --no-headers \
+    | awk '{
+        printf "   %-20s  %-28s  %-12s  %s\n", $1, $2, $3, $5
+      }'
+
+  _divider
+  _ok "Status complete"
+}
+
+# ─── Help ─────────────────────────────────────────────────────────────────────
+
 show_help() {
   cat <<'EOF'
 Usage:
   bash ./mamma.sh <command>
   ./mamma.sh <command>
 
-Commands:
-  build     Build the Docker image
-  b         Alias for build
-  run       Run the Docker container (foreground)
-  r         Alias for run
-  verify    Smoke test / and /healthz
-  v         Alias for verify
-  all       Build then verify (expects container already running)
-  cluster   Create the local k3d cluster (idempotent)
-  deploy    Import image into k3d and install/upgrade Helm chart
-  down      Delete the k3d cluster and free resources
-  menu      Open interactive menu
-  help      Show this help
+Docker commands:
+  build       Build the Docker image
+  b           Alias for build
+  run         Run the container in the foreground (Ctrl+C to stop)
+  r           Alias for run
+  run-bg      Run the container detached in the background
+  stop        Stop and remove the detached container
+  verify      Smoke test / and /healthz
+  v           Alias for verify
+  all         Build then verify (expects container already running)
+
+Kubernetes commands:
+  cluster     Create the local k3d cluster (idempotent)
+  deploy      Import image into k3d and install/upgrade Helm chart
+  down        Delete the k3d cluster and free resources
+  status      Show node, pod, and service health for the k3d cluster
+
+General:
+  menu        Open interactive menu
+  help        Show this help
+
+Environment:
+  Set CI=true to activate structured log output (plain text, [LEVEL] prefixes).
+  GitHub Actions sets this automatically.
 EOF
 }
+
+# ─── Interactive menu ──────────────────────────────────────────────────────────
 
 menu_main() {
   while true; do
     _header
+    echo -e "  ${BOLD}Docker${RESET}"
     echo -e "  ${BOLD}1)${RESET} Build"
-    echo -e "  ${BOLD}2)${RESET} Run"
-    echo -e "  ${BOLD}3)${RESET} Verify"
-    echo -e "  ${BOLD}4)${RESET} Build -> Verify"
+    echo -e "  ${BOLD}2)${RESET} Run (foreground)"
+    echo -e "  ${BOLD}3)${RESET} Run in background"
+    echo -e "  ${BOLD}4)${RESET} Stop background container"
+    echo -e "  ${BOLD}5)${RESET} Verify"
+    echo -e "  ${BOLD}6)${RESET} Build -> Verify"
     echo ""
-    echo -e "  ${BOLD}5)${RESET} Create k3d cluster"
-    echo -e "  ${BOLD}6)${RESET} Deploy to k3d"
-    echo -e "  ${BOLD}7)${RESET} Down k3d cluster"
+    echo -e "  ${BOLD}Kubernetes${RESET}"
+    echo -e "  ${BOLD}7)${RESET} Create k3d cluster"
+    echo -e "  ${BOLD}8)${RESET} Deploy to k3d"
+    echo -e "  ${BOLD}9)${RESET} Cluster status"
+    echo -e "  ${BOLD}0)${RESET} Down k3d cluster"
     echo ""
     echo -e "  ${BOLD}q)${RESET} Quit"
     echo ""
@@ -257,13 +429,16 @@ menu_main() {
     read -r choice
 
     case "${choice}" in
-      1) do_build; _pause ;;
-      2) do_run; _pause ;;
-      3) do_verify; _pause ;;
-      4) do_build && do_verify; _pause ;;
-      5) do_cluster; _pause ;;
-      6) do_deploy; _pause ;;
-      7) do_down; _pause ;;
+      1) do_build;                  _pause ;;
+      2) do_run;                    _pause ;;
+      3) do_run_bg;                 _pause ;;
+      4) do_stop;                   _pause ;;
+      5) do_verify;                 _pause ;;
+      6) do_build && do_verify;     _pause ;;
+      7) do_cluster;                _pause ;;
+      8) do_deploy;                 _pause ;;
+      9) do_status;                 _pause ;;
+      0) do_down;                   _pause ;;
       q|Q)
         echo -e "\n${DIM}  Bye.${RESET}\n"
         exit 0
@@ -273,17 +448,22 @@ menu_main() {
   done
 }
 
+# ─── Entry point ──────────────────────────────────────────────────────────────
+
 main() {
   local cmd="${1:-menu}"
   case "${cmd}" in
-    build|b) do_build ;;
-    run|r) do_run ;;
-    verify|v) do_verify ;;
-    all) do_build; do_verify ;;
-    cluster) do_cluster ;;
-    deploy) do_deploy ;;
-    down) do_down ;;
-    menu) menu_main ;;
+    build|b)   do_build   ;;
+    run|r)     do_run     ;;
+    run-bg)    do_run_bg  ;;
+    stop)      do_stop    ;;
+    verify|v)  do_verify  ;;
+    all)       do_build; do_verify ;;
+    cluster)   do_cluster ;;
+    deploy)    do_deploy  ;;
+    down)      do_down    ;;
+    status)    do_status  ;;
+    menu)      menu_main  ;;
     help|-h|--help) show_help ;;
     *)
       _err "Unknown command: ${cmd}"
