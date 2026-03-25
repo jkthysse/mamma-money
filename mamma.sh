@@ -21,40 +21,57 @@ source "${ENV_SCRIPT}"
 DOCKERFILE="${DOCKERFILE:-src/Dockerfile}"
 BASE_URL="${HOST_PROTOCOL}://${HOST_SERVER_NAME}:${HOST_PORT}"
 
-# ─── Logging ──────────────────────────────────────────────────────────────────
+# ─── Logging ─────────────────────────────────────────────────────────────────
+# CI=true (set automatically by GitHub Actions and most CI platforms) activates
+# structured log mode: plain text, no ANSI colour, no Unicode box-drawing, and
+# every line is prefixed with a log-level tag so it is easy to grep or parse.
+# Interactive mode uses colour and symbols for readability.
 
-BOLD="\033[1m"
-DIM="\033[2m"
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-YELLOW="\033[0;33m"
-BLUE="\033[0;34m"
-CYAN="\033[0;36m"
-RESET="\033[0m"
+CI="${CI:-false}"
 
-_header() {
-  clear
-  echo -e "${BOLD}${BLUE}"
-  echo "  ╔══════════════════════════════════════╗"
-  echo "  ║          mamma-money  devtools       ║"
-  echo "  ╚══════════════════════════════════════╝"
-  echo -e "${RESET}"
-  echo -e "  ${DIM}Image:${RESET} ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}   ${DIM}Port:${RESET} ${HOST_PORT}   ${DIM}Platform:${RESET} ${TARGET_PLATFORM}"
-  echo ""
-}
+if [[ "${CI}" == "true" ]]; then
+  _step()    { echo "[INFO]  $*"; }
+  _ok()      { echo "[OK]    $*"; }
+  _err()     { echo "[ERROR] $*" >&2; }
+  _warn()    { echo "[WARN]  $*"; }
+  _dim()     { echo "[INFO]  $*"; }
+  _divider() { :; }
+  _header()  { :; }
+  _pause()   { :; }
+else
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  RED="\033[0;31m"
+  GREEN="\033[0;32m"
+  YELLOW="\033[0;33m"
+  BLUE="\033[0;34m"
+  CYAN="\033[0;36m"
+  RESET="\033[0m"
 
-_step()    { echo -e "\n${CYAN}▶  $*${RESET}"; }
-_ok()      { echo -e "${GREEN}✔  $*${RESET}"; }
-_err()     { echo -e "${RED}✘  $*${RESET}" >&2; }
-_warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
-_dim()     { echo -e "${DIM}   $*${RESET}"; }
-_divider() { echo -e "${DIM}   ────────────────────────────────────${RESET}"; }
+  _header() {
+    clear
+    echo -e "${BOLD}${BLUE}"
+    echo "  ╔══════════════════════════════════════╗"
+    echo "  ║          mamma-money  devtools       ║"
+    echo "  ╚══════════════════════════════════════╝"
+    echo -e "${RESET}"
+    echo -e "  ${DIM}Image:${RESET} ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}   ${DIM}Port:${RESET} ${HOST_PORT}   ${DIM}Platform:${RESET} ${TARGET_PLATFORM}"
+    echo ""
+  }
 
-_pause() {
-  echo ""
-  echo -en "${DIM}   Press Enter to return to the menu...${RESET}"
-  read -r
-}
+  _step()    { echo -e "\n${CYAN}▶  $*${RESET}"; }
+  _ok()      { echo -e "${GREEN}✔  $*${RESET}"; }
+  _err()     { echo -e "${RED}✘  $*${RESET}" >&2; }
+  _warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
+  _dim()     { echo -e "${DIM}   $*${RESET}"; }
+  _divider() { echo -e "${DIM}   ────────────────────────────────────${RESET}"; }
+
+  _pause() {
+    echo ""
+    echo -en "${DIM}   Press Enter to return to the menu...${RESET}"
+    read -r
+  }
+fi
 
 # ─── Preflight helpers ────────────────────────────────────────────────────────
 
@@ -144,7 +161,7 @@ do_run() {
 # run-bg — detached; use `stop` to remove it.
 do_run_bg() {
   _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
-  _require_docker_daemon
+  _require_docker_daemon 
   _require_port_free
 
   _step "Starting container (detached)"
@@ -329,6 +346,10 @@ Kubernetes commands:
 General:
   menu        Open interactive menu
   help        Show this help
+
+Environment:
+  Set CI=true to activate structured log output (plain text, [LEVEL] prefixes).
+  GitHub Actions sets this automatically.
 EOF
 }
 
