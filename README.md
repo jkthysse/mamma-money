@@ -25,7 +25,7 @@ This repository contains a containerised Go web server and development documenta
 
 ## Prerequisites
 
-- Curl: See [the official curl website](https://curl.se/windows/)
+- Curl: See [the official curl website](https://curl.se/)
 - Go 1.22+ `curl -sS https://webinstall.dev/golang | bash`
 - Git: `curl -sS https://webinstall.dev/git | bash`
 - Docker (BuildKit-enabled): `curl -fsSL https://get.docker.com | bash`
