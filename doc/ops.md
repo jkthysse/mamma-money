@@ -77,7 +77,7 @@ An earlier iteration hardcoded `nodePort: 30080` in `values.local.yaml`. This ca
 
 An earlier iteration used two separate variables: `PORT` (for Docker and verification) and `HOST_PORT` (for the k3d cluster port mapping). These were required to always match, creating a silent misconfiguration risk — changing one without the other caused `verify` to fail with `HTTP 000`.
 
-`HOST_PORT` was removed and replaced with `HOST_PORT`, which is used everywhere the host port is needed: Docker port binding, the `BASE_URL` for verification, and the k3d cluster port mapping. Changing `HOST_PORT` once in `ops/.env` is sufficient.
+`PORT` was removed and replaced with `HOST_PORT`, which is used everywhere the host port is needed: Docker port binding, the `BASE_URL` for verification, and the k3d cluster port mapping. Changing `HOST_PORT` once in `ops/.env` is sufficient.
 
 The Go application reads `PORT` as its internal listening port, not `HOST_PORT`. `mamma.sh` bridges the two by passing `HOST_PORT`'s value into the container as `-e PORT="${HOST_PORT}"`. This preserves the application's interface while keeping the operator configuration clean.
 
@@ -146,19 +146,19 @@ bash ./mamma.sh down
 
 **1) Cluster creation (`bash ./mamma.sh cluster`)**
 
-<img src="img/cluster_create.png" alt="K3d cluster created" width="800" style="height:auto;" />
+![k3d cluster created](./img/cluster_create.png)
 
 **2) Build + deploy (`bash ./mamma.sh build` + `bash ./mamma.sh deploy`)**
 
-<img src="img/cluster_build.png" alt="K3d cluster build output" width="800" style="height:auto;" />
+![k3d cluster build output](./img/cluster_build.png)
 
-<img src="img/cluster_deploy.png" alt="Helm deploy into the cluster" width="800" style="height:auto;" />
+![Helm deploy into the cluster](./img/cluster_deploy.png)
 
 **3) Verify + kubectl checks (`bash ./mamma.sh verify`)**
 
-<img src="img/cluster_verify.png" alt="K3d verify results" width="800" style="height:auto;" />
+![k3d verify results](./img/cluster_verify.png)
 
-<img src="img/kubectl_checks.png" alt="Kubectl preflight and checks" width="800" style="height:auto;" />
+![kubectl preflight and checks](./img/kubectl_checks.png)
 
 ### Cluster configuration
 
