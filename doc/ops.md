@@ -140,7 +140,7 @@ bash ./mamma.sh verify
 bash ./mamma.sh down
 ```
 
-> Note on the assessment 'bonus' port (8081): the requirement suggests port-forwarding to `localhost:8081`. This repo instead uses a fixed k3d host port mapping (`HOST_PORT:NODE_PORT`) so `mamma.sh verify` runs against the same `BASE_URL` format used for Docker. The screenshots below reflect the default `HOST_PORT=8080`. To match the requirement exactly, set `HOST_PORT=8081` in `ops/.env` and rerun `cluster`, `deploy`, and `verify`.
+> Note on the assessment 'bonus' port (8081): the requirement suggests port-forwarding to `localhost:8081`. This repo instead uses a fixed k3d host port mapping (`HOST_PORT:NODE_PORT`) so `mamma.sh verify` runs against the same `BASE_URL` format used for Docker. See [Assessor Notes](./assessors.md) for the full deviation rationale. The screenshots below reflect the default `HOST_PORT=8080`. To match the requirement exactly, set `HOST_PORT=8081` in `ops/.env` and rerun `cluster`, `deploy`, and `verify`.
 
 **Evidence: local k3d workflow (screenshots)**
 
