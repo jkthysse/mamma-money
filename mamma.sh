@@ -71,7 +71,7 @@ _require() {
 # ─── Commands ─────────────────────────────────────────────────────────────────
 
 do_build() {
-  _require docker "Install Docker Desktop and enable BuildKit"
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
 
   _step "Building image"
   _dim  "dockerfile : ${DOCKERFILE}"
@@ -91,10 +91,11 @@ do_build() {
   _ok "Image ready: ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
+# run — foreground, container removed on exit (Ctrl+C).
 do_run() {
-  _require docker
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
 
-  _step "Starting container"
+  _step "Starting container (foreground)"
   _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
   _dim  "url   : ${BASE_URL}"
   _divider
@@ -108,8 +109,45 @@ do_run() {
     "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
 }
 
+# run-bg — detached; use `stop` to remove it.
+do_run_bg() {
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+
+  _step "Starting container (detached)"
+  _dim  "image : ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
+  _dim  "url   : ${BASE_URL}"
+  _dim  "name  : ${CONTAINER_NAME}"
+  _divider
+
+  docker run -d \
+    --name "${CONTAINER_NAME}" \
+    -p "${HOST_PORT}:${HOST_PORT}" \
+    -e PORT="${HOST_PORT}" \
+    "${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
+
+  _ok "Container started. Run 'bash ./mamma.sh verify' to check endpoints."
+  _ok "Run 'bash ./mamma.sh stop' to remove it."
+}
+
+# stop — stops and removes the named container started by run-bg.
+do_stop() {
+  _require docker "Install Docker Desktop and enable BuildKit: curl -fsSL https://get.docker.com | bash"
+
+  _step "Stopping container '${CONTAINER_NAME}'"
+  _divider
+
+  if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+    _warn "Container '${CONTAINER_NAME}' is not running — nothing to stop."
+    return 0
+  fi
+
+  docker stop "${CONTAINER_NAME}"
+  docker rm   "${CONTAINER_NAME}" 2>/dev/null || true
+  _ok "Container stopped and removed."
+}
+
 do_verify() {
-  _require curl
+  _require curl "Install Curl: https://curl.se/"
 
   _step "Verifying endpoints at ${BASE_URL}"
   _divider
@@ -237,19 +275,25 @@ Usage:
   bash ./mamma.sh <command>
   ./mamma.sh <command>
 
-Commands:
-  build     Build the Docker image
-  b         Alias for build
-  run       Run the Docker container (foreground)
-  r         Alias for run
-  verify    Smoke test / and /healthz
-  v         Alias for verify
-  all       Build then verify (expects container already running)
-  cluster   Create the local k3d cluster (idempotent)
-  deploy    Import image into k3d and install/upgrade Helm chart
-  down      Delete the k3d cluster and free resources
-  menu      Open interactive menu
-  help      Show this help
+Docker commands:
+  build       Build the Docker image
+  b           Alias for build
+  run         Run the container in the foreground (Ctrl+C to stop)
+  r           Alias for run
+  run-bg      Run the container detached in the background
+  stop        Stop and remove the detached container
+  verify      Smoke test / and /healthz
+  v           Alias for verify
+  all         Build then verify (expects container already running)
+
+Kubernetes commands:
+  cluster     Create the local k3d cluster (idempotent)
+  deploy      Import image into k3d and install/upgrade Helm chart
+  down        Delete the k3d cluster and free resources
+
+General:
+  menu        Open interactive menu
+  help        Show this help
 EOF
 }
 
@@ -258,14 +302,18 @@ EOF
 menu_main() {
   while true; do
     _header
+    echo -e "  ${BOLD}Docker${RESET}"
     echo -e "  ${BOLD}1)${RESET} Build"
-    echo -e "  ${BOLD}2)${RESET} Run"
-    echo -e "  ${BOLD}3)${RESET} Verify"
-    echo -e "  ${BOLD}4)${RESET} Build -> Verify"
+    echo -e "  ${BOLD}2)${RESET} Run (foreground)"
+    echo -e "  ${BOLD}3)${RESET} Run in background"
+    echo -e "  ${BOLD}4)${RESET} Stop background container"
+    echo -e "  ${BOLD}5)${RESET} Verify"
+    echo -e "  ${BOLD}6)${RESET} Build -> Verify"
     echo ""
-    echo -e "  ${BOLD}5)${RESET} Create k3d cluster"
-    echo -e "  ${BOLD}6)${RESET} Deploy to k3d"
-    echo -e "  ${BOLD}7)${RESET} Down k3d cluster"
+    echo -e "  ${BOLD}Kubernetes${RESET}"
+    echo -e "  ${BOLD}7)${RESET} Create k3d cluster"
+    echo -e "  ${BOLD}8)${RESET} Deploy to k3d"
+    echo -e "  ${BOLD}9)${RESET} Down k3d cluster"
     echo ""
     echo -e "  ${BOLD}q)${RESET} Quit"
     echo ""
@@ -275,11 +323,13 @@ menu_main() {
     case "${choice}" in
       1) do_build;              _pause ;;
       2) do_run;                _pause ;;
-      3) do_verify;             _pause ;;
-      4) do_build && do_verify; _pause ;;
-      5) do_cluster;            _pause ;;
-      6) do_deploy;             _pause ;;
-      7) do_down;               _pause ;;
+      3) do_run_bg;             _pause ;;
+      4) do_stop;               _pause ;;
+      5) do_verify;             _pause ;;
+      6) do_build && do_verify; _pause ;;
+      7) do_cluster;            _pause ;;
+      8) do_deploy;             _pause ;;
+      9) do_down;               _pause ;;
       q|Q)
         echo -e "\n${DIM}  Bye.${RESET}\n"
         exit 0
@@ -296,6 +346,8 @@ main() {
   case "${cmd}" in
     build|b)        do_build   ;;
     run|r)          do_run     ;;
+    run-bg)         do_run_bg  ;;
+    stop)           do_stop    ;;
     verify|v)       do_verify  ;;
     all)            do_build; do_verify ;;
     cluster)        do_cluster ;;
