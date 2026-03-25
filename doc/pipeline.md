@@ -93,7 +93,7 @@ The short SHA makes every build traceable back to the exact commit that produced
 - **Code scanning (CodeQL)** and **code quality (SARIF)** gates are enforced by GitHub **branch protection / rulesets** once analysis results exist for the required checks. The workflow supplies those results; the rule configuration defines pass thresholds (for example high-or-higher security and errors-level blocking).
 - **Copilot code review** (review on push, excluding draft pull requests) is a repository-level Copilot and rules configuration. It is not expressed in `ci.yaml`; it complements CI but does not replace the lint and build jobs.
 
-See also [Contribution guidelines](./contributing.md) for the documented `main` branch rule expectations.
+See also [Contribution Guidelines](./contributing.md) for the documented `main` branch rule expectations.
 
 ## Trade-offs
 
