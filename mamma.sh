@@ -319,6 +319,56 @@ do_down() {
   _ok "Cluster deleted"
 }
 
+# status — quick node and pod health overview for the k3d cluster.
+do_status() {
+  _require kubectl "Install kubectl: https://kubernetes.io/docs/tasks/tools/"
+
+  local cluster_name="${CLUSTER_NAME:-mamma-money}"
+  local context="k3d-${cluster_name}"
+
+  _step "Cluster status: ${cluster_name}"
+  _divider
+
+  if ! kubectl --context "${context}" cluster-info &>/dev/null; then
+    _err "Cannot reach cluster '${cluster_name}'. Is it running? (bash ./mamma.sh cluster)"
+    return 1
+  fi
+
+  _dim "Nodes"
+  kubectl --context "${context}" get nodes \
+    -o wide \
+    --no-headers \
+    | awk '{
+        status = $2; name = $1; role = $3; version = $5; os = $9
+        icon = (status == "Ready") ? "✔" : "✘"
+        printf "   %s  %-28s  %-12s  %-8s  %s\n", icon, name, role, status, version
+      }'
+
+  echo ""
+  _dim "Pods (all namespaces)"
+  kubectl --context "${context}" get pods \
+    --all-namespaces \
+    --no-headers \
+    | awk '{
+        ns = $1; name = $2; ready = $3; status = $4; restarts = $5
+        icon = (status == "Running" || status == "Completed") ? "✔" : "✘"
+        printf "   %s  %-20s  %-36s  %-12s  ready: %s  restarts: %s\n", \
+          icon, ns, name, status, ready, restarts
+      }'
+
+  echo ""
+  _dim "Services"
+  kubectl --context "${context}" get svc \
+    --all-namespaces \
+    --no-headers \
+    | awk '{
+        printf "   %-20s  %-28s  %-12s  %s\n", $1, $2, $3, $5
+      }'
+
+  _divider
+  _ok "Status complete"
+}
+
 # ─── Help ─────────────────────────────────────────────────────────────────────
 
 show_help() {
@@ -342,6 +392,7 @@ Kubernetes commands:
   cluster     Create the local k3d cluster (idempotent)
   deploy      Import image into k3d and install/upgrade Helm chart
   down        Delete the k3d cluster and free resources
+  status      Show node, pod, and service health for the k3d cluster
 
 General:
   menu        Open interactive menu
@@ -369,7 +420,8 @@ menu_main() {
     echo -e "  ${BOLD}Kubernetes${RESET}"
     echo -e "  ${BOLD}7)${RESET} Create k3d cluster"
     echo -e "  ${BOLD}8)${RESET} Deploy to k3d"
-    echo -e "  ${BOLD}9)${RESET} Down k3d cluster"
+    echo -e "  ${BOLD}9)${RESET} Cluster status"
+    echo -e "  ${BOLD}0)${RESET} Down k3d cluster"
     echo ""
     echo -e "  ${BOLD}q)${RESET} Quit"
     echo ""
@@ -377,15 +429,16 @@ menu_main() {
     read -r choice
 
     case "${choice}" in
-      1) do_build;              _pause ;;
-      2) do_run;                _pause ;;
-      3) do_run_bg;             _pause ;;
-      4) do_stop;               _pause ;;
-      5) do_verify;             _pause ;;
-      6) do_build && do_verify; _pause ;;
-      7) do_cluster;            _pause ;;
-      8) do_deploy;             _pause ;;
-      9) do_down;               _pause ;;
+      1) do_build;                  _pause ;;
+      2) do_run;                    _pause ;;
+      3) do_run_bg;                 _pause ;;
+      4) do_stop;                   _pause ;;
+      5) do_verify;                 _pause ;;
+      6) do_build && do_verify;     _pause ;;
+      7) do_cluster;                _pause ;;
+      8) do_deploy;                 _pause ;;
+      9) do_status;                 _pause ;;
+      0) do_down;                   _pause ;;
       q|Q)
         echo -e "\n${DIM}  Bye.${RESET}\n"
         exit 0
@@ -400,17 +453,18 @@ menu_main() {
 main() {
   local cmd="${1:-menu}"
   case "${cmd}" in
-    build|b)        do_build   ;;
-    run|r)          do_run     ;;
-    run-bg)         do_run_bg  ;;
-    stop)           do_stop    ;;
-    verify|v)       do_verify  ;;
-    all)            do_build; do_verify ;;
-    cluster)        do_cluster ;;
-    deploy)         do_deploy  ;;
-    down)           do_down    ;;
-    menu)           menu_main  ;;
-    help|-h|--help) show_help  ;;
+    build|b)   do_build   ;;
+    run|r)     do_run     ;;
+    run-bg)    do_run_bg  ;;
+    stop)      do_stop    ;;
+    verify|v)  do_verify  ;;
+    all)       do_build; do_verify ;;
+    cluster)   do_cluster ;;
+    deploy)    do_deploy  ;;
+    down)      do_down    ;;
+    status)    do_status  ;;
+    menu)      menu_main  ;;
+    help|-h|--help) show_help ;;
     *)
       _err "Unknown command: ${cmd}"
       show_help
