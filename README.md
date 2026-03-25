@@ -5,7 +5,7 @@ This repository contains a containerised Go web server and development documenta
 ## Repository Index
 
 - `.github/workflows/ci.yaml`: GitHub CI pipeline configuration
-- `doc/contributing.md`: [Contribution guidelines](./doc/contributing.md)
+- `doc/contributing.md`: [Contributing guide](./doc/contributing.md)
 - `doc/docker.md`: [Docker feature development document](./doc/docker.md)
 - `doc/helm.md`: [Helm feature development document](./doc/helm.md)
 - `doc/ops.md`: [Operations scripts and local k3d deployment](./doc/ops.md)
@@ -24,23 +24,9 @@ This repository contains a containerised Go web server and development documenta
 
 ## Prerequisites
 
-- Go 1.22+: `sudo apt install golang-go` or better for updated versions:
-
-```bash
-sudo add-apt-repository ppa:longsleep/golang-backports
-sudo apt update
-sudo apt install golang-go
-```
-
-- Git: `sudo apt install git`
-- Docker (BuildKit-enabled): `curl -fsSL https://get.docker.com | bash`
-
-BuildKit has been enabled by default since Docker 23, so no additional configuration needed.
-That said — on WSL2 most developers would typically install Docker Desktop on Windows and enable the WSL2 backend in its settings, rather than installing Docker Engine inside WSL2 directly. Docker Desktop then makes the Docker socket available inside WSL2 automatically.
-
-## Requirements for local cluster deployment
-- K3d: `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.0 bash`
-- Helm: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`
+- Go 1.22+
+- Git
+- Docker (BuildKit-enabled)
 
 ## Configuration
 
@@ -55,7 +41,7 @@ Commands in this repository are written for Bash.
 ### First-run checklist
 
 1. Create `ops/.env` from `ops/.env.example`
-2. Confirm `PLATFORM`, `PORT`, and `IMAGE` values
+2. Confirm `TARGET_PLATFORM`, `HOST_PORT`, and `DOCKER_IMAGE` values
 3. Run `mamma.sh` commands from repo root
 
 ### Start here
@@ -64,7 +50,7 @@ Commands in this repository are written for Bash.
 - See [Local k3d deployment](./README.md#operator-flow---deploy-to-local-k3d-cluster)
 - See [Helm deployment details](./doc/helm.md)
 - See [CI behaviour and trade-offs](./doc/pipeline.md)
-- See [Contribution guidelines](./doc/contributing.md)
+- See [Contribution workflow](./doc/contributing.md)
 
 ### Developer Flow - Run with Go:
 
@@ -73,7 +59,7 @@ Run this command from the repository root.
 ```bash
 go run ./src/app
 ```
-The app listens on `PORT` (default `8080`).
+The app listens on `HOST_PORT` (default `8080`).
 
 ### Operator Flow - Run with Docker:
 
@@ -109,18 +95,47 @@ bash ./mamma.sh verify   # smoke test (same as Docker)
 bash ./mamma.sh down     # delete the cluster and free resources
 ```
 
+## Assessment Bonus Notes (evidence + deviations)
+
+### Port-forward on `localhost:8081` vs `HOST_PORT` + NodePort mapping
+
+The assessment bonus suggests port-forwarding the service to `localhost:8081` and including screenshots proving:
+- the app is reachable at `http://localhost:8081/`
+- the health check at `http://localhost:8081/healthz`
+- `kubectl get pods` and `kubectl get svc` showing healthy resources
+
+This repo intentionally documents and verifies using the same URL construction for Docker and Kubernetes via `mamma.sh`:
+- `BASE_URL = http://<HOST_SERVER_NAME>:<HOST_PORT>` (from `ops/.env`)
+- `verify` performs `curl` against `/` and `/healthz` at `BASE_URL`
+
+That means the evidence is captured for the configured `HOST_PORT`. The default is `HOST_PORT=8080`, so the included screenshots demonstrate the workflow at `http://localhost:8080/` rather than `8081`.
+
+To reproduce the assessment's exact `8081` URLs, set `HOST_PORT=8081` in `ops/.env` (and keep `NODE_PORT` consistent with `service.nodePort` injection via `mamma.sh`), then rerun:
+`bash ./mamma.sh cluster && bash ./mamma.sh build && bash ./mamma.sh deploy && bash ./mamma.sh verify`
+
+![k3d verify evidence](./doc/img/cluster_verify.png)
+![kubectl resource checks](./doc/img/kubectl_checks.png)
+
+### Repo layout: `src/` artefacts vs root `Dockerfile`/`helm/`
+
+The assessment spec asks for the `Dockerfile` and Helm chart in the repository root.
+
+This implementation intentionally keeps application artefacts under `src/` and reserves the repo root for operational tooling (`mamma.sh`, `ops/.env`, CI). The trade-off is a small documentation deviation, but it improves maintainability and correctness:
+- Docker build context is scoped to `src/` (`DOCKER_BUILD_CONTEXT=src`) to avoid sending unnecessary files
+- `mamma.sh` explicitly references `src/Dockerfile` and deploys `src/helm/mamma-money-api` (with the shared `src/helm/lib-common` dependency)
+
 ## Troubleshooting
 
 - `Error: .env not found`  
   Create `ops/.env` from `ops/.env.example`.
 - `bind: address already in use`  
-  Change `PORT` in `ops/.env` or stop the process using that port.
+  Change `HOST_PORT` in `ops/.env` or stop the process using that port.
 - `buildx` command unavailable  
   Ensure Docker Desktop is up to date and Buildx is enabled.
 
-## Notes for Contributors
+## Notes for contributors
 
 - Keep Docker build context scoped to `src` to avoid sending unnecessary files.
 - Maintain multi-stage build pattern and a non-root runtime image.
 - When adding dependencies, keep `go.mod` and `go.sum` in `src/app` updated.
-- See the [Contribution guidelines](./doc/contributing.md)
+- See the [Contributing guide](./doc/contributing.md)

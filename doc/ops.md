@@ -57,19 +57,35 @@ The load balancer is required for the `--port` mapping that exposes the NodePort
 
 ### 6) Fixed NodePort with k3d port mapping over `kubectl port-forward`
 
-The cluster is created with a fixed host-to-node port mapping (`K3D_HOST_PORT:K3D_NODE_PORT`), and the Helm chart is deployed with a matching `NodePort` service via `values.local.yaml`. This means `verify` works identically against both Docker and k3d without any reconfiguration — `BASE_URL` in `ops/.env` points to the same `HOST:PORT` in both cases.
+The cluster is created with a fixed host-to-node port mapping (`HOST_PORT:NODE_PORT`), and the Helm chart is deployed with a matching `NodePort` service. This means `verify` works identically against both Docker and k3d without any reconfiguration — `BASE_URL` in `ops/.env` points to the same `${HOST_PROTOCOL}://${HOST_SERVER_NAME}:${HOST_PORT}` in both cases.
 
-The alternative — relying on `kubectl port-forward` — would require a persistent background process, is fragile under network changes, and creates a divergent workflow between Docker and k3d. The trade-off is that `K3D_NODE_PORT` must not conflict with other services in the cluster, which is unlikely in a minimal local setup.
+The alternative — relying on `kubectl port-forward` — would require a persistent background process, is fragile under network changes, and creates a divergent workflow between Docker and k3d. The trade-off is that `NODE_PORT` must not conflict with other services in the cluster, which is unlikely in a minimal local setup.
 
 ### 7) Cluster preflight check in `deploy`
 
 `deploy` checks that the named k3d cluster exists before attempting to import the image or run Helm. Without this check, a missing cluster produces an opaque k3d or Helm error mid-operation. The preflight exits early with a clear message pointing the operator to `mamma.sh cluster`.
 
-### 8) `values.local.yaml` as an explicit local override file
+### 8) `values.local.yaml` as an explicit local override file with dynamic NodePort injection
 
-Rather than passing `--set` flags at deploy time, local k3d overrides are captured in `values.local.yaml` and committed to the repository. This makes the local deployment configuration visible, reviewable, and consistent across machines. The base `values.yaml` is unchanged and remains valid for non-local environments — the separation ensures no local-only values accidentally propagate to production deployments.
+Local k3d overrides are captured in `values.local.yaml` and committed to the repository, making local deployment configuration visible, reviewable, and consistent across machines. The base `values.yaml` is unchanged and remains valid for non-local environments.
 
-### 9) Configurable cluster topology via `ops/.env`
+`service.nodePort` is intentionally absent from `values.local.yaml`. It is injected dynamically at deploy time by `mamma.sh` via `--set service.nodePort="${NODE_PORT}"`, sourced from `ops/.env`. This means `NODE_PORT` is the single source of truth for the node port — changing it in `.env` flows through to both the cluster port mapping and the Helm service without requiring any manual edits to committed files.
+
+An earlier iteration hardcoded `nodePort: 30080` in `values.local.yaml`. This caused a silent misconfiguration: when `NODE_PORT` was changed in `.env`, the cluster port mapping updated correctly but the Helm service continued to expose the old port, resulting in connection failures (`HTTP 000` from curl) with no obvious error message.
+
+### 9) `HOST_PORT` as the single source of truth for the host port
+
+An earlier iteration used two separate variables: `PORT` (for Docker and verification) and `HOST_PORT` (for the k3d cluster port mapping). These were required to always match, creating a silent misconfiguration risk — changing one without the other caused `verify` to fail with `HTTP 000`.
+
+`HOST_PORT` was removed and replaced with `HOST_PORT`, which is used everywhere the host port is needed: Docker port binding, the `BASE_URL` for verification, and the k3d cluster port mapping. Changing `HOST_PORT` once in `ops/.env` is sufficient.
+
+The Go application reads `PORT` as its internal listening port, not `HOST_PORT`. `mamma.sh` bridges the two by passing `HOST_PORT`'s value into the container as `-e PORT="${HOST_PORT}"`. This preserves the application's interface while keeping the operator configuration clean.
+
+### 10) `teardown` renamed to `down`
+
+The command was renamed from `teardown` to `down` for brevity and consistency with common container tooling conventions (`docker compose down`). The underlying function was renamed from `do_teardown` to `do_down` to match. All references — the command dispatcher, menu, and help text — were updated consistently.
+
+### 11) Configurable cluster topology via `ops/.env`
 
 Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` variables rather than hardcoded in the script. This allows developers on different machines to tune their local setup without modifying shared code. All variables have defaults that produce a working minimal cluster out of the box, so no configuration is required for a standard setup.
 
@@ -81,16 +97,18 @@ Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` 
 - **Maintainability:** Reduced script duplication and centralised change management.
 - **Usability:** Supports both scripted and interactive operation from the same entrypoint.
 - **Robustness:** Path-safe config loading, fail-fast shell mode, and preflight checks surface problems early.
-- **Portability:** Works on Linux, macOS, and Windows (WSL2). Git Bash on Windows is not tested and not recommended due to path translation behaviour and k3d compatibility.
+- **Portability:** Works on Linux, macOS, and WSL2 without modification.
 - **Local parity:** Fixed port mapping means `verify` behaves identically against Docker and k3d.
+- **Single source of truth for ports:** `HOST_PORT` and `NODE_PORT` are the only values to change when reconfiguring ports — no duplication, no silent mismatches.
 
 ### Costs / limitations
 
 - **Single script responsibility grows:** `mamma.sh` now owns more behaviour and may need occasional refactoring as features expand.
 - **Menu complexity:** Interactive mode adds UX code that is not needed for CI/non-interactive contexts.
 - **`all` semantics are intentionally simple:** `all` runs build + verify and expects a running container for verification; it does not orchestrate a detached run lifecycle.
-- **k3d port conflict risk:** The fixed `K3D_NODE_PORT` could conflict with another service in the cluster, though this is unlikely in a minimal local setup.
+- **k3d port conflict risk:** The fixed `NODE_PORT` could conflict with another service in the cluster, though this is unlikely in a minimal local setup.
 - **`values.local.yaml` is committed:** Local override values are visible in the repository, which is intentional for transparency but means the file should never contain secrets.
+- **`HOST_PORT` / app `PORT` indirection:** The mapping between `HOST_PORT` (operator config) and `PORT` (app env var) is implicit in `mamma.sh`. A developer reading the Dockerfile or Go source will see `PORT`; a developer reading `ops/.env` will see `HOST_PORT`. This is documented but adds a small cognitive overhead.
 
 ## Operational guidance
 
@@ -103,7 +121,7 @@ Cluster shape (server count, agent count, port mapping) is driven by `ops/.env` 
   - `bash ./mamma.sh r`
   - `bash ./mamma.sh v`
 
-## Local k3d deployment
+## Local k3d deployment (WSL2)
 
 For deploying to a local Kubernetes cluster on a resource-constrained machine, the workflow is:
 
@@ -122,24 +140,44 @@ bash ./mamma.sh verify
 bash ./mamma.sh down
 ```
 
+> Note on the assessment 'bonus' port (8081): the requirement suggests port-forwarding to `localhost:8081`. This repo instead uses a fixed k3d host port mapping (`HOST_PORT:NODE_PORT`) so `mamma.sh verify` runs against the same `BASE_URL` format used for Docker. The screenshots below reflect the default `HOST_PORT=8080`. To match the requirement exactly, set `HOST_PORT=8081` in `ops/.env` and rerun `cluster`, `deploy`, and `verify`.
+
+**Evidence: local k3d workflow (screenshots)**
+
+**1) Cluster creation (`bash ./mamma.sh cluster`)**
+
+![k3d cluster created](./img/cluster_create.png)
+
+**2) Build + deploy (`bash ./mamma.sh build` + `bash ./mamma.sh deploy`)**
+
+![k3d cluster build output](./img/cluster_build.png)
+
+![Helm deploy into the cluster](./img/cluster_deploy.png)
+
+**3) Verify + kubectl checks (`bash ./mamma.sh verify`)**
+
+![k3d verify results](./img/cluster_verify.png)
+
+![kubectl preflight and checks](./img/kubectl_checks.png)
+
 ### Cluster configuration
 
 The `cluster` command is fully configurable via `ops/.env`. All variables have sensible defaults so no changes are required for a standard local setup.
 
 | Variable | Default | Description |
 |---|---|---|
-| `K3D_CLUSTER_NAME` | `mamma-money` | Name of the local k3d cluster |
-| `K3D_SERVERS` | `1` | Number of server nodes |
-| `K3D_AGENTS` | `0` | Number of agent nodes |
-| `K3D_HOST_PORT` | `8080` | Host port mapped into the cluster |
-| `K3D_NODE_PORT` | `30080` | NodePort exposed by the cluster |
+| `HOST_PORT` | `8080` | Host port — used for Docker, verification, and k3d port mapping |
+| `CLUSTER_NAME` | `mamma-money` | Name of the local k3d cluster |
+| `CLUSTER_SERVERS` | `1` | Number of server nodes |
+| `CLUSTER_AGENTS` | `0` | Number of agent nodes |
+| `NODE_PORT` | `30080` | NodePort exposed by the cluster |
 
-The default configuration is intentionally minimal — a single server node with no agents, Traefik, or metrics-server disabled.
+`HOST_PORT` is the single variable to change when running on a different port. It flows through to Docker port binding, the `BASE_URL` used by `verify`, and the k3d cluster port mapping automatically.
 
 Developers who want a heavier local setup (e.g. a dedicated agent node) can override the relevant variables in their `ops/.env`:
 
 ```bash
-K3D_AGENTS=1
+CLUSTER_AGENTS=1
 ```
 
 The port mapping means `verify` works identically against both Docker and k3d without reconfiguration.
@@ -148,7 +186,9 @@ The port mapping means `verify` works identically against both Docker and k3d wi
 
 `values.local.yaml` is applied automatically by `deploy`. It overrides:
 - `image.pullPolicy: Never` — uses the locally imported image without attempting a registry pull
-- `service.type: NodePort` with `nodePort: 30080` — aligns with the k3d port mapping
+- `service.type: NodePort` — exposes the service via a fixed node port
+
+`service.nodePort` is not hardcoded in `values.local.yaml`. It is injected dynamically at deploy time from `NODE_PORT` in `ops/.env` via `--set service.nodePort`. This ensures the node port is always consistent with the cluster port mapping without requiring manual edits to committed files.
 
 The base `values.yaml` is unchanged and remains valid for non-local environments.
 
