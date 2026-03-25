@@ -17,7 +17,7 @@ The trade-off is a layout difference from the specification examples, documented
 - Non-root execution via the `nonroot` user baked into the distroless image
 - BuildKit cache mounts so incremental rebuilds only recompile what changed
 
-![Docker image evidence](./img/docker_image.png)
+<img src="img/docker_image.png" alt="Docker image evidence" width="800" style="height:auto;" />
 
 ## Runtime behaviour
 
@@ -44,7 +44,7 @@ bash ./mamma.sh run     # runs the container on port 8080
 bash ./mamma.sh verify  # hits / and /healthz to confirm the container is up
 ```
 
-![Local Docker containers evidence](./img/docker_containers.png)
+<img src="img/docker_containers.png" alt="Local Docker containers evidence" width="800" style="height:auto;" />
 
 ### Platform and cross-compilation
 

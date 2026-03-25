@@ -77,7 +77,7 @@ An earlier iteration hardcoded `nodePort: 30080` in `values.local.yaml`. This ca
 
 An earlier iteration used two separate variables: `PORT` (for Docker and verification) and `HOST_PORT` (for the k3d cluster port mapping). These were required to always match, creating a silent misconfiguration risk — changing one without the other caused `verify` to fail with `HTTP 000`.
 
-`HOST_PORT` was removed and replaced with `HOST_PORT`, which is used everywhere the host port is needed: Docker port binding, the `BASE_URL` for verification, and the k3d cluster port mapping. Changing `HOST_PORT` once in `ops/.env` is sufficient.
+`PORT` was removed and replaced with `HOST_PORT`, which is used everywhere the host port is needed: Docker port binding, the `BASE_URL` for verification, and the k3d cluster port mapping. Changing `HOST_PORT` once in `ops/.env` is sufficient.
 
 The Go application reads `PORT` as its internal listening port, not `HOST_PORT`. `mamma.sh` bridges the two by passing `HOST_PORT`'s value into the container as `-e PORT="${HOST_PORT}"`. This preserves the application's interface while keeping the operator configuration clean.
 
@@ -140,7 +140,7 @@ bash ./mamma.sh verify
 bash ./mamma.sh down
 ```
 
-> Note on the assessment 'bonus' port (8081): the requirement suggests port-forwarding to `localhost:8081`. This repo instead uses a fixed k3d host port mapping (`HOST_PORT:NODE_PORT`) so `mamma.sh verify` runs against the same `BASE_URL` format used for Docker. The screenshots below reflect the default `HOST_PORT=8080`. To match the requirement exactly, set `HOST_PORT=8081` in `ops/.env` and rerun `cluster`, `deploy`, and `verify`.
+> Note on the assessment 'bonus' port (8081): the requirement suggests port-forwarding to `localhost:8081`. This repo instead uses a fixed k3d host port mapping (`HOST_PORT:NODE_PORT`) so `mamma.sh verify` runs against the same `BASE_URL` format used for Docker. See [Assessor Notes](./assessors.md) for the full deviation rationale. The screenshots below reflect the default `HOST_PORT=8080`. To match the requirement exactly, set `HOST_PORT=8081` in `ops/.env` and rerun `cluster`, `deploy`, and `verify`.
 
 **Evidence: local k3d workflow (screenshots)**
 
