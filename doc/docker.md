@@ -8,7 +8,7 @@ The assessment specification lists Dockerfile and Helm/chart artefacts at reposi
 
 All source code — Go application, Dockerfile, and Helm charts — lives under `src/`. The repository root is reserved for operations: shell scripts, environment configuration, and CI. This separation keeps application implementation and operational tooling clearly partitioned.
 
-The trade-off is a layout difference from the specification examples, documented explicitly in this document. The Docker build context is scoped to `src/` (`BUILD_CONTEXT=src` in `ops/.env`), and the Dockerfile is referenced by `mamma.sh` during build execution.
+The trade-off is a layout difference from the specification examples, documented explicitly in this document. The Docker build context is scoped to `src/` (`DOCKER_BUILD_CONTEXT=src` in `ops/.env`), and the Dockerfile is referenced by `mamma.sh` during build execution.
 
 ## What the image provides
 
@@ -16,6 +16,8 @@ The trade-off is a layout difference from the specification examples, documented
 - A `distroless/static` runtime image — no shell, no package manager, nothing an attacker can use
 - Non-root execution via the `nonroot` user baked into the distroless image
 - BuildKit cache mounts so incremental rebuilds only recompile what changed
+
+![Docker image evidence](./img/docker_image.png)
 
 ## Runtime behaviour
 
@@ -34,7 +36,7 @@ Review [README](../README.md) before running local container workflows. Refer es
 - [Shell Compatibility](../README.md#shell-compatibility)
 - [Troubleshooting](../README.md#troubleshooting)
 
-The `PLATFORM` value in `ops/.env` controls the build target and should match deployment architecture. Example: Apple Silicon development targeting x86 should keep `PLATFORM=linux/amd64`.
+The `TARGET_PLATFORM` value in `ops/.env` controls the build target and should match deployment architecture. Example: Apple Silicon development targeting x86 should keep `TARGET_PLATFORM=linux/amd64`.
 
 ```bash
 bash ./mamma.sh build   # builds and loads the image into local Docker
@@ -42,11 +44,13 @@ bash ./mamma.sh run     # runs the container on port 8080
 bash ./mamma.sh verify  # hits / and /healthz to confirm the container is up
 ```
 
+![Local Docker containers evidence](./img/docker_containers.png)
+
 ### Platform and cross-compilation
 
-The Dockerfile is configured for cross-compilation. The builder stage runs on `$BUILDPLATFORM`, and the Go compiler targets `PLATFORM` from `ops/.env` via `GOOS`/`GOARCH`. This allows native-speed builds for cross-architecture targets without emulation.
+The Dockerfile is configured for cross-compilation. The builder stage runs on `$BUILDPLATFORM`, and the Go compiler targets `TARGET_PLATFORM` from `ops/.env` via `GOOS`/`GOARCH`. This allows native-speed builds for cross-architecture targets without emulation.
 
-This matters when deploying to AWS Graviton (t4g, m7g, c7g instances), which are ARM-based and typically 20–40% cheaper than equivalent x86 instances. Setting `PLATFORM=linux/arm64` in `.env` produces a Graviton-compatible image from any machine without any other changes.
+This matters when deploying to AWS Graviton (t4g, m7g, c7g instances), which are ARM-based and typically 20–40% cheaper than equivalent x86 instances. Setting `TARGET_PLATFORM=linux/arm64` in `.env` produces a Graviton-compatible image from any machine without any other changes.
 
 ## Dockerfile walk-through
 
